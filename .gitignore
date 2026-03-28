@@ -30,3 +30,7 @@ Thumbs.db
 *.joblib
 *.npy
 *.npz
+
+# Dataset / training artifacts
+**/data/
+**/train/
