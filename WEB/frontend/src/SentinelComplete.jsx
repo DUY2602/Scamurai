@@ -1,5 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
+import DashboardPreview from "./dashboard/DashboardPreview.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -1660,6 +1661,8 @@ const AnalyzerApp = ({mx, my}) => {
           </motion.section>
         )}
       </AnimatePresence>
+
+      <DashboardPreview />
 
       <motion.footer initial={{opacity:0}} animate={{opacity:1}} transition={{delay:1.2}} style={{textAlign:"center",marginTop:72,paddingTop:30,borderTop:"1px solid rgba(0,229,255,.05)"}}>
         <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:20,flexWrap:"wrap"}}>{["247,832 THREATS TRACKED","99.98% UPTIME","<15ms LATENCY","AI MODEL v2.4.1"].map(s=>(<span key={s} className="f-mono" style={{fontSize:11,color:"rgba(100,140,170,.28)",letterSpacing:1.2}}>{s}</span>))}</div>
