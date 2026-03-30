@@ -1,6 +1,9 @@
 fastapi
 uvicorn[standard]
 python-multipart
+sqlalchemy
+psycopg[binary]
+pymysql
 scikit-learn
 joblib
 pandas

@@ -24,6 +24,11 @@ Thumbs.db
 # Logs
 *.log
 
+# Environment files
+.env
+.env.*
+!.env.example
+
 !URL/models/.gitkeep
 
 # Local ML / cache artifacts
