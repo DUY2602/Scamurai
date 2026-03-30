@@ -1,98 +1,167 @@
 import os
 import sys
-import joblib
 import warnings
-warnings.filterwarnings('ignore')
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+import joblib
+import numpy as np
+
+warnings.filterwarnings("ignore")
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+MODELS_FOLDER = os.path.join(ROOT, "models")
+
+sys.path.append(ROOT)
 from utils.preprocess import extract_features
 
+
+MODEL_SPECS = [
+    ("LGBM", "lightgbm_malware_model.pkl", False),
+    ("XGB", "xgboost_malware_model.pkl", False),
+    ("KMeans", "kmeans_malware_model.pkl", True),
+]
+
+
+def _load_pickle(filename):
+    path = os.path.join(MODELS_FOLDER, filename)
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Missing required artifact: {path}")
+    return joblib.load(path)
+
+
+def load_artifacts():
+    if not os.path.exists(MODELS_FOLDER):
+        raise FileNotFoundError(f"Folder not found: {MODELS_FOLDER}")
+
+    return {
+        "models": {
+            display_name: _load_pickle(filename)
+            for display_name, filename, _ in MODEL_SPECS
+        },
+        "feature_scaler": _load_pickle("feature_scaler.pkl"),
+    }
+
+
+ARTIFACTS = load_artifacts()
+
+
+def _prediction_to_label(prediction):
+    return "MALWARE" if int(prediction) == 1 else "BENIGN"
+
+
+def _format_confidence(model, model_input):
+    if not hasattr(model, "predict_proba"):
+        return "N/A"
+
+    probabilities = model.predict_proba(model_input)[0]
+    return f"{max(probabilities) * 100:.2f}%"
+
+
+def _extract_feature_array(file_path):
+    features = extract_features(file_path, label=None)
+    if not features:
+        raise ValueError("Cannot extract features (ensure the file type is executable)")
+
+    # Drop MD5 and label, matching the notebook feature slice.
+    X_raw = np.array([features[1:-1]], dtype=float)
+    return features, X_raw
+
+
+def predict_file(file_path):
+    candidate_path = str(file_path or "").strip().strip('"').strip("'")
+    if not candidate_path:
+        raise ValueError("File path is empty")
+    if not os.path.exists(candidate_path):
+        raise FileNotFoundError(f"File not found: {candidate_path}")
+
+    features, X_raw = _extract_feature_array(candidate_path)
+    X_scaled = ARTIFACTS["feature_scaler"].transform(X_raw)
+
+    predictions = {}
+    for display_name, _, use_scaled_features in MODEL_SPECS:
+        model = ARTIFACTS["models"][display_name]
+        model_input = X_scaled if use_scaled_features else X_raw
+        pred = model.predict(model_input)[0]
+        predictions[display_name] = {
+            "prediction": _prediction_to_label(pred),
+            "confidence": _format_confidence(model, model_input),
+        }
+
+    return {
+        "file_path": candidate_path,
+        "features": features,
+        "predictions": predictions,
+    }
+
+
+def print_feature_summary(file_path, features):
+    print("\n" + "=" * 60)
+    print(f"FILE: {os.path.basename(file_path)}")
+    print("-" * 60)
+    print(f"Sections: {features[1]}")
+    print(f"Avg Entropy: {features[2]}")
+    print(f"Max Entropy: {features[3]}")
+    print(f"Suspicious Sections: {features[4]}")
+    print(f"DLLs: {features[5]}")
+    print(f"Imports: {features[6]}")
+    print(f"Sensitive API: {'Yes' if features[7] == 1 else 'None'}")
+    print(f"Image Base: {features[8]}")
+    print(f"Size Image: {features[9]}")
+    print(f"Has Version Info: {'Yes' if features[10] == 1 else 'None'}")
+    print("=" * 60)
+
+
+def print_prediction_table(predictions):
+    print("\nTEST RESULT:")
+    print("-" * 60)
+    print(f"{'Model':<15} {'Prediction':<10} {'Confidence':<15}")
+    print("-" * 60)
+
+    for model_name, result in predictions.items():
+        print(f"{model_name:<15} {result['prediction']:<10} {result['confidence']:<15}")
+
+    print("-" * 60)
+
+
 def main():
-    print("="*60)
+    print("=" * 60)
     print("MALWARE DETECTION - TEST ALL MODELS")
-    print("="*60)
-    
-    # Input file to test
+    print("=" * 60)
+
     file_path = input("\nPath to test file: ").strip()
-    file_path = file_path.strip('"').strip("'")
-    
-    if not os.path.exists(file_path):
-        print(f"File not found: {file_path}")
-        return
-    
-    # Find all model in the folder
-    models_folder = "FILE/models"
-    if not os.path.exists(models_folder):
-        print("Folder 'models' not found")
-        return
-    
-    model_files = [f for f in os.listdir(models_folder) if f.endswith('_model.pkl')]
-    
-    if not model_files:
-        print("Cannot find any model files in 'FILE/models' folder")
-        return
-    
-    print(f"\nFound {len(model_files)} models:")
-    for m in model_files:
-        print(f"  - {m}")
-    
+
     try:
-        # Extract features
-        print("\nExtracting features...")
-        features = extract_features(file_path, label=None)
-        
-        if not features:
-            print("Cannot extract features (ensure the file type is executable)")
-            return
-        
-        # Prepare data for prediction (drop MD5 & label)
-        X = [features[1:-1]]
-        
-        # Show features of the file
-        print("\n" + "="*60)
-        print(f"FILE: {os.path.basename(file_path)}")
-        print("-"*60)
-        print(f"Sections: {features[1]}")
-        print(f"Avg Entropy: {features[2]}")
-        print(f"Max Entropy: {features[3]}")
-        print(f"Suspicious Sections: {features[4]}")
-        print(f"DLLs: {features[5]}")
-        print(f"Imports: {features[6]}")
-        print(f"Sensitive API: {'Yes' if features[7] == 1 else 'None'}")
-        print(f"Image Base: {features[8]}")
-        print(f"Size Image: {features[9]}")
-        print(f"Has Version Info: {'Yes' if features[10] == 1 else 'None'}")
-        print("="*60)
-        
-        # Test every model
-        print("\nTEST RESULT:")
-        print("-"*60)
-        print(f"{'Model':<15} {'Prediction':<10} {'Confidence':<15}")
-        print("-"*60)
-        
-        for model_file in model_files:
-            model_path = os.path.join(models_folder, model_file)
-            model_name = model_file.replace('_model.pkl', '')
-            
-            # Load model
-            model = joblib.load(model_path)
-            
-            # Predict
-            pred = model.predict(X)[0]
-            result = "MALWARE" if pred == 1 else "BENIGN"
-            
-            # Probability
-            conf = ""
-            if hasattr(model, 'predict_proba'):
-                prob = model.predict_proba(X)[0]
-                conf = f"{max(prob)*100:.2f}%"
-            
-            print(f"{model_name:<15} {result:<10} {conf:<15}")
-        
-        print("-"*60)
-        
-    except Exception as e:
-        print(f"Error: {e}")
+        result = predict_file(file_path)
+        print_feature_summary(result["file_path"], result["features"])
+        print_prediction_table(result["predictions"])
+    except Exception as exc:
+        print(f"Error: {exc}")
+
+
+def run_smoke_test():
+    test_files = [
+        ("benign", r"C:\Windows\System32\notepad.exe"),
+        ("malware", os.path.join(ROOT, "test", "malware_sample.exe")),
+    ]
+
+    print("\n" + "=" * 60)
+    print("SMOKE TEST")
+    print("=" * 60)
+
+    for sample_kind, sample_path in test_files:
+        if not os.path.exists(sample_path):
+            print(f"{sample_kind.upper():<8} {sample_path} -> SKIPPED (file not found)")
+            continue
+
+        try:
+            result = predict_file(sample_path)
+            print(f"{sample_kind.upper():<8} {sample_path}")
+            for model_name, prediction in result["predictions"].items():
+                print(f"  {model_name}: {prediction['prediction']}")
+        except Exception as exc:
+            print(f"{sample_kind.upper():<8} {sample_path} -> ERROR ({exc})")
+
 
 if __name__ == "__main__":
-    main()
+    run_smoke_test()
+    if sys.stdin.isatty():
+        main()

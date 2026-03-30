@@ -144,6 +144,31 @@ def extract_features(url: str) -> dict[str, object]:
     }
 
 
+def apply_domain_stat_features(
+    feature_df: pd.DataFrame,
+    registered_domain_stats: dict[str, dict[str, float]] | None = None,
+    global_benign_rate: float = 0.5,
+) -> pd.DataFrame:
+    enriched = feature_df.copy()
+    domain_stats = registered_domain_stats or {}
+
+    benign_rates = []
+    seen_counts = []
+
+    for domain in enriched.get("registered_domain", pd.Series(dtype=str)).fillna(""):
+        stats = domain_stats.get(str(domain))
+        if stats is None:
+            benign_rates.append(float(global_benign_rate))
+            seen_counts.append(0.0)
+        else:
+            benign_rates.append(float(stats.get("benign_rate", global_benign_rate)))
+            seen_counts.append(math.log1p(float(stats.get("seen_count", 0.0))))
+
+    enriched["registered_domain_benign_rate"] = benign_rates
+    enriched["registered_domain_seen_count"] = seen_counts
+    return enriched
+
+
 def process_and_save_csv(input_path: str, output_path: str) -> None:
     print(f"Loading data from: {input_path}")
     try:
