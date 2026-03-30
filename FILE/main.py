@@ -127,7 +127,11 @@ def main():
     print("MALWARE DETECTION - TEST ALL MODELS")
     print("=" * 60)
 
-    file_path = input("\nPath to test file: ").strip()
+    try:
+        file_path = input("\nPath to test file: ").strip()
+    except EOFError:
+        print("\nNo interactive input available. Exiting CLI.")
+        return
 
     try:
         result = predict_file(file_path)
