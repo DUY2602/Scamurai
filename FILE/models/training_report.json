@@ -1,0 +1,157 @@
+{
+  "task": "file_malware_retraining",
+  "data_path": "FILE\\data\\malware_data_final.csv",
+  "models_dir": "FILE\\models",
+  "backup_dir": "FILE\\models\\backups\\20260331-175749",
+  "dataset": {
+    "rows": 7045,
+    "train_rows": 5642,
+    "test_rows": 1409,
+    "hardcase_rows": 6,
+    "label_distribution": {
+      "benign": 2880,
+      "malware": 4165
+    }
+  },
+  "lightgbm": {
+    "accuracy": 0.9922,
+    "f1": 0.9934,
+    "confusion_matrix": [
+      [
+        570,
+        6
+      ],
+      [
+        5,
+        828
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 0.991304347826087,
+        "recall": 0.9895833333333334,
+        "f1-score": 0.9904430929626412,
+        "support": 576.0
+      },
+      "1": {
+        "precision": 0.9928057553956835,
+        "recall": 0.9939975990396158,
+        "f1-score": 0.9934013197360528,
+        "support": 833.0
+      },
+      "accuracy": 0.9921930447125621,
+      "macro avg": {
+        "precision": 0.9920550516108853,
+        "recall": 0.9917904661864746,
+        "f1-score": 0.991922206349347,
+        "support": 1409.0
+      },
+      "weighted avg": {
+        "precision": 0.9921919791287654,
+        "recall": 0.9921930447125621,
+        "f1-score": 0.9921919949514644,
+        "support": 1409.0
+      }
+    },
+    "roc_auc": 0.9998
+  },
+  "xgboost": {
+    "accuracy": 0.9922,
+    "f1": 0.9934,
+    "confusion_matrix": [
+      [
+        569,
+        7
+      ],
+      [
+        4,
+        829
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 0.9930191972076788,
+        "recall": 0.9878472222222222,
+        "f1-score": 0.9904264577893821,
+        "support": 576.0
+      },
+      "1": {
+        "precision": 0.9916267942583732,
+        "recall": 0.9951980792316927,
+        "f1-score": 0.9934092270820851,
+        "support": 833.0
+      },
+      "accuracy": 0.9921930447125621,
+      "macro avg": {
+        "precision": 0.992322995733026,
+        "recall": 0.9915226507269574,
+        "f1-score": 0.9919178424357336,
+        "support": 1409.0
+      },
+      "weighted avg": {
+        "precision": 0.9921960093746259,
+        "recall": 0.9921930447125621,
+        "f1-score": 0.9921898693016756,
+        "support": 1409.0
+      }
+    },
+    "roc_auc": 0.9997
+  },
+  "ensemble": {
+    "accuracy": 0.9936,
+    "f1": 0.9946,
+    "confusion_matrix": [
+      [
+        572,
+        4
+      ],
+      [
+        5,
+        828
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 0.9913344887348353,
+        "recall": 0.9930555555555556,
+        "f1-score": 0.9921942758022549,
+        "support": 576.0
+      },
+      "1": {
+        "precision": 0.9951923076923077,
+        "recall": 0.9939975990396158,
+        "f1-score": 0.9945945945945946,
+        "support": 833.0
+      },
+      "accuracy": 0.99361249112846,
+      "macro avg": {
+        "precision": 0.9932633982135715,
+        "recall": 0.9935265772975856,
+        "f1-score": 0.9933944351984247,
+        "support": 1409.0
+      },
+      "weighted avg": {
+        "precision": 0.993615229112106,
+        "recall": 0.99361249112846,
+        "f1-score": 0.9936133429094366,
+        "support": 1409.0
+      }
+    }
+  },
+  "metadata": {
+    "feature_columns": [
+      "Sections",
+      "AvgEntropy",
+      "MaxEntropy",
+      "SuspiciousSections",
+      "DLLs",
+      "Imports",
+      "HasSensitiveAPI",
+      "ImageBase",
+      "SizeOfImage",
+      "HasVersionInfo"
+    ],
+    "scale_pos_weight": 0.692769,
+    "hardcase_scale": 1.0
+  }
+}

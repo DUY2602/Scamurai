@@ -1,0 +1,53 @@
+{
+  "cv_summary": {
+    "lightgbm": {
+      "f1_mean": 0.9614032229226591,
+      "f1_std": 0.01028205486505954,
+      "precision_mean": 0.9700411099325228,
+      "precision_std": 0.006126013772116194,
+      "recall_mean": 0.9535092940086584,
+      "recall_std": 0.015026639959024982
+    },
+    "linear_svc": {
+      "f1_mean": 0.9703206145759717,
+      "f1_std": 0.008434619836561854,
+      "precision_mean": 0.9746093406529066,
+      "precision_std": 0.005412885823108175,
+      "recall_mean": 0.9665909034349152,
+      "recall_std": 0.015215514764221063
+    },
+    "logistic_regression": {
+      "f1_mean": 0.9527940642785667,
+      "f1_std": 0.015857993896347407,
+      "precision_mean": 0.947517308435921,
+      "precision_std": 0.01802926543077337,
+      "recall_mean": 0.9592967952310699,
+      "recall_std": 0.020285587185467316
+    }
+  },
+  "hardcase_macro_f1": 0.898989898989899,
+  "hardcase_save_threshold": 0.6,
+  "label_classes": [
+    "ham",
+    "spam"
+  ],
+  "numeric_features": [
+    "num_urls",
+    "email_length",
+    "num_exclamation",
+    "upper_case_ratio",
+    "url_to_text_ratio",
+    "has_generic_greeting",
+    "is_free_email"
+  ],
+  "selected_model": "logistic_regression",
+  "validation_macro_f1": 0.9611043111655106,
+  "vectorizer": {
+    "max_features": 5000,
+    "ngram_range": [
+      1,
+      2
+    ],
+    "vocabulary_size": 5000
+  }
+}

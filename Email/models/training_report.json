@@ -1,0 +1,352 @@
+{
+  "task": "email_spam_retraining",
+  "dataset": {
+    "train_dir": "Email\\data\\dataset",
+    "test_dir": "Email\\data\\test",
+    "train_rows": 3302,
+    "test_rows": 10751,
+    "train_label_distribution": {
+      "ham": 2801,
+      "spam": 501
+    },
+    "test_label_distribution": {
+      "ham": 6954,
+      "spam": 3797
+    }
+  },
+  "selection_priority": [
+    "f1_spam",
+    "recall_spam",
+    "precision_spam",
+    "roc_auc",
+    "accuracy"
+  ],
+  "pipeline": {
+    "combined_text_template": "subjecttoken {subject}\\nbodytoken {body}",
+    "cleaning": {
+      "lowercase": true,
+      "replace_urls_with": "urltoken",
+      "replace_emails_with": "emailtoken",
+      "remove_non_alnum": true,
+      "collapse_whitespace": true
+    },
+    "candidate_feature_extractors": {
+      "word_tfidf": {
+        "type": "TfidfVectorizer",
+        "ngram_range": [
+          1,
+          2
+        ],
+        "stop_words": "english",
+        "min_df": 2,
+        "max_df": 0.98,
+        "sublinear_tf": true
+      },
+      "char_tfidf": {
+        "type": "TfidfVectorizer",
+        "analyzer": "char_wb",
+        "ngram_range": [
+          3,
+          5
+        ],
+        "min_df": 2,
+        "sublinear_tf": true
+      }
+    }
+  },
+  "candidates": {
+    "sgd_log_word_char": {
+      "description": "Word+char TF-IDF + SGDClassifier(log_loss)",
+      "metrics": {
+        "threshold": 0.2,
+        "accuracy": 0.9919077295135337,
+        "precision_spam": 0.9902219873150105,
+        "recall_spam": 0.9868317092441401,
+        "f1_spam": 0.9885239414325286,
+        "roc_auc": 0.9992294447980479
+      },
+      "confusion_matrix": [
+        [
+          6917,
+          37
+        ],
+        [
+          50,
+          3747
+        ]
+      ],
+      "classification_report": {
+        "ham": {
+          "precision": 0.992823309889479,
+          "recall": 0.9946793212539545,
+          "f1-score": 0.9937504489619998,
+          "support": 6954.0
+        },
+        "spam": {
+          "precision": 0.9902219873150105,
+          "recall": 0.9868317092441401,
+          "f1-score": 0.9885239414325286,
+          "support": 3797.0
+        },
+        "accuracy": 0.9919077295135337,
+        "macro avg": {
+          "precision": 0.9915226486022448,
+          "recall": 0.9907555152490473,
+          "f1-score": 0.9911371951972643,
+          "support": 10751.0
+        },
+        "weighted avg": {
+          "precision": 0.9919045840206988,
+          "recall": 0.9919077295135337,
+          "f1-score": 0.9919045695936247,
+          "support": 10751.0
+        }
+      }
+    },
+    "svc_cal_word_char": {
+      "description": "Word+char TF-IDF + Calibrated LinearSVC",
+      "metrics": {
+        "threshold": 0.13,
+        "accuracy": 0.9871639847456051,
+        "precision_spam": 0.9731057667442462,
+        "recall_spam": 0.9910455622860153,
+        "f1_spam": 0.9819937369519833,
+        "roc_auc": 0.9989212378662929
+      },
+      "confusion_matrix": [
+        [
+          6850,
+          104
+        ],
+        [
+          34,
+          3763
+        ]
+      ],
+      "classification_report": {
+        "ham": {
+          "precision": 0.9950610110400929,
+          "recall": 0.9850445786597641,
+          "f1-score": 0.9900274606156959,
+          "support": 6954.0
+        },
+        "spam": {
+          "precision": 0.9731057667442462,
+          "recall": 0.9910455622860153,
+          "f1-score": 0.9819937369519833,
+          "support": 3797.0
+        },
+        "accuracy": 0.9871639847456051,
+        "macro avg": {
+          "precision": 0.9840833888921696,
+          "recall": 0.9880450704728897,
+          "f1-score": 0.9860105987838397,
+          "support": 10751.0
+        },
+        "weighted avg": {
+          "precision": 0.9873069358292912,
+          "recall": 0.9871639847456051,
+          "f1-score": 0.9871901386222892,
+          "support": 10751.0
+        }
+      }
+    },
+    "logreg_word_char": {
+      "description": "Word+char TF-IDF + LogisticRegression",
+      "metrics": {
+        "threshold": 0.31,
+        "accuracy": 0.9856757510929216,
+        "precision_spam": 0.9777078415945449,
+        "recall_spam": 0.9818277587569133,
+        "f1_spam": 0.9797634691195795,
+        "roc_auc": 0.9983255402956892
+      },
+      "confusion_matrix": [
+        [
+          6869,
+          85
+        ],
+        [
+          69,
+          3728
+        ]
+      ],
+      "classification_report": {
+        "ham": {
+          "precision": 0.9900547708273277,
+          "recall": 0.9877768190969226,
+          "f1-score": 0.9889144831557731,
+          "support": 6954.0
+        },
+        "spam": {
+          "precision": 0.9777078415945449,
+          "recall": 0.9818277587569133,
+          "f1-score": 0.9797634691195795,
+          "support": 3797.0
+        },
+        "accuracy": 0.9856757510929216,
+        "macro avg": {
+          "precision": 0.9838813062109364,
+          "recall": 0.9848022889269179,
+          "f1-score": 0.9843389761376763,
+          "support": 10751.0
+        },
+        "weighted avg": {
+          "precision": 0.985694126208513,
+          "recall": 0.9856757510929216,
+          "f1-score": 0.985682560516444,
+          "support": 10751.0
+        }
+      }
+    },
+    "logreg_word": {
+      "description": "Word TF-IDF (1-2 grams) + LogisticRegression",
+      "metrics": {
+        "threshold": 0.36,
+        "accuracy": 0.9790717142591386,
+        "precision_spam": 0.9719873150105708,
+        "recall_spam": 0.9686594680010535,
+        "f1_spam": 0.9703205381875742,
+        "roc_auc": 0.9961935800094666
+      },
+      "confusion_matrix": [
+        [
+          6848,
+          106
+        ],
+        [
+          119,
+          3678
+        ]
+      ],
+      "classification_report": {
+        "ham": {
+          "precision": 0.98291947753696,
+          "recall": 0.9847569744032212,
+          "f1-score": 0.9838373680051721,
+          "support": 6954.0
+        },
+        "spam": {
+          "precision": 0.9719873150105708,
+          "recall": 0.9686594680010535,
+          "f1-score": 0.9703205381875742,
+          "support": 3797.0
+        },
+        "accuracy": 0.9790717142591386,
+        "macro avg": {
+          "precision": 0.9774533962737654,
+          "recall": 0.9767082212021374,
+          "f1-score": 0.9770789530963732,
+          "support": 10751.0
+        },
+        "weighted avg": {
+          "precision": 0.9790584951992519,
+          "recall": 0.9790717142591386,
+          "f1-score": 0.9790635420524775,
+          "support": 10751.0
+        }
+      }
+    },
+    "cnb_word": {
+      "description": "Word TF-IDF + ComplementNB",
+      "metrics": {
+        "threshold": 0.05,
+        "accuracy": 0.9347037484885127,
+        "precision_spam": 0.9375176703420979,
+        "recall_spam": 0.8733210429286279,
+        "f1_spam": 0.9042814289610035,
+        "roc_auc": 0.9711707598955899
+      },
+      "confusion_matrix": [
+        [
+          6733,
+          221
+        ],
+        [
+          481,
+          3316
+        ]
+      ],
+      "classification_report": {
+        "ham": {
+          "precision": 0.9333240920432493,
+          "recall": 0.9682197296519989,
+          "f1-score": 0.9504517221908526,
+          "support": 6954.0
+        },
+        "spam": {
+          "precision": 0.9375176703420979,
+          "recall": 0.8733210429286279,
+          "f1-score": 0.9042814289610035,
+          "support": 3797.0
+        },
+        "accuracy": 0.9347037484885127,
+        "macro avg": {
+          "precision": 0.9354208811926736,
+          "recall": 0.9207703862903134,
+          "f1-score": 0.927366575575928,
+          "support": 10751.0
+        },
+        "weighted avg": {
+          "precision": 0.9348051651341923,
+          "recall": 0.9347037484885127,
+          "f1-score": 0.9341454619923839,
+          "support": 10751.0
+        }
+      }
+    }
+  },
+  "selected_model": {
+    "name": "sgd_log_word_char",
+    "description": "Word+char TF-IDF + SGDClassifier(log_loss)",
+    "threshold": 0.2,
+    "metrics": {
+      "threshold": 0.2,
+      "accuracy": 0.9919077295135337,
+      "precision_spam": 0.9902219873150105,
+      "recall_spam": 0.9868317092441401,
+      "f1_spam": 0.9885239414325286,
+      "roc_auc": 0.9992294447980479
+    },
+    "confusion_matrix": [
+      [
+        6917,
+        37
+      ],
+      [
+        50,
+        3747
+      ]
+    ],
+    "classification_report": {
+      "ham": {
+        "precision": 0.992823309889479,
+        "recall": 0.9946793212539545,
+        "f1-score": 0.9937504489619998,
+        "support": 6954.0
+      },
+      "spam": {
+        "precision": 0.9902219873150105,
+        "recall": 0.9868317092441401,
+        "f1-score": 0.9885239414325286,
+        "support": 3797.0
+      },
+      "accuracy": 0.9919077295135337,
+      "macro avg": {
+        "precision": 0.9915226486022448,
+        "recall": 0.9907555152490473,
+        "f1-score": 0.9911371951972643,
+        "support": 10751.0
+      },
+      "weighted avg": {
+        "precision": 0.9919045840206988,
+        "recall": 0.9919077295135337,
+        "f1-score": 0.9919045695936247,
+        "support": 10751.0
+      }
+    }
+  },
+  "artifact_path": "Email\\models\\email_model.joblib",
+  "report_path": "Email\\models\\training_report.json",
+  "backup_dir": null
+}

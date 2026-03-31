@@ -24,17 +24,17 @@ import pandas as pd
 import pefile
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from schemas import AnalyzeTextRequest, AnalyzeUrlRequest
 
 
 BACKEND_DIR = Path(__file__).resolve().parent
-MODEL_PATH = BACKEND_DIR / "spam_model.joblib"
 DEFAULT_THRESHOLD = 0.5
 MAX_UPLOAD_BYTES = 100 * 1024 * 1024  # 100 MB
 MAX_UPLOAD_LABEL = f"{MAX_UPLOAD_BYTES // (1024 * 1024)} MB"
 REPO_ROOT = BACKEND_DIR.parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+from ml_artifact_utils import load_xgboost_model
 FILE_MODELS_DIR = REPO_ROOT / "FILE" / "models"
 URL_MODELS_DIR = REPO_ROOT / "URL" / "models"
 try:
@@ -426,19 +426,6 @@ ATTACHMENT_PASSWORD_HINTS = {
     "unlock",
     "protected",
 }
-
-
-class AnalyzeTextRequest(BaseModel):
-    """Request body for manual subject/body analysis."""
-
-    subject: str = ""
-    body: str = ""
-
-
-class AnalyzeUrlRequest(BaseModel):
-    """Request body for URL threat analysis."""
-
-    url: str
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -1367,11 +1354,24 @@ def is_meaningful_url(url: str) -> bool:
     """Filter out malformed URL values."""
     if not url:
         return False
-    parsed = parse_url_like(url)
+    try:
+        parsed = parse_url_like(url)
+    except Exception:
+        return False
     host = (parsed.hostname or "").lower()
     if not host or "." not in host:
         return False
     return True
+
+
+def validate_user_supplied_url(url: str) -> str:
+    """Validate a URL/domain before sending it through the ML pipeline."""
+    candidate = normalize_url_candidate(str(url or "").strip())
+    if not candidate:
+        raise HTTPException(status_code=400, detail="URL must not be empty.")
+    if not is_meaningful_url(candidate):
+        raise HTTPException(status_code=400, detail="Provide a valid URL or bare domain.")
+    return candidate
 
 
 def url_path_extension(path: str) -> str:
@@ -2053,31 +2053,6 @@ def compute_risk_breakdown(
     }
 
 
-def compute_risk_score(
-    *,
-    spam_probability: float,
-    threshold: float,
-    header_analysis: dict[str, Any],
-    url_analysis: dict[str, Any],
-    html_analysis: dict[str, Any],
-    attachment_analysis: dict[str, Any],
-    language_analysis: dict[str, Any],
-    header_context_available: bool = True,
-) -> float:
-    """Backward-compatible wrapper returning final hybrid risk score."""
-    breakdown = compute_risk_breakdown(
-        spam_probability=spam_probability,
-        threshold=threshold,
-        header_analysis=header_analysis,
-        url_analysis=url_analysis,
-        html_analysis=html_analysis,
-        attachment_analysis=attachment_analysis,
-        language_analysis=language_analysis,
-        header_context_available=header_context_available,
-    )
-    return float(breakdown["final_risk_score"])
-
-
 def determine_verdict(
     risk_score: float,
     spam_probability: float,
@@ -2116,30 +2091,6 @@ def compute_confidence(verdict: str, spam_probability: float, risk_score: float)
         distance = min(abs(risk_score - 45.0) / 15.0, 1.0)
         confidence = 0.55 + 0.2 * distance
     return clamp(confidence, 0.0, 1.0)
-
-
-def resolve_spam_class_index(classifier: Any, label_map: dict[Any, Any] | None = None) -> int:
-    """Resolve spam class index from classifier classes + optional label map."""
-    classes = list(getattr(classifier, "classes_", []))
-    if not classes:
-        return 1
-
-    normalized_map = label_map or {}
-    for idx, class_value in enumerate(classes):
-        mapped = normalized_map.get(class_value)
-        if mapped is None:
-            try:
-                mapped = normalized_map.get(int(class_value))
-            except (TypeError, ValueError):
-                mapped = None
-        if isinstance(mapped, str) and mapped.strip().lower() == "spam":
-            return idx
-
-    for idx, class_value in enumerate(classes):
-        if str(class_value).strip().lower() in {"1", "spam", "true"}:
-            return idx
-
-    return max(0, len(classes) - 1)
 
 
 def build_indicators(
@@ -2315,31 +2266,20 @@ def analyze_content(
     app.state.threshold = threshold
     ml_indicators: list[str] = []
 
-    if email_runtime["mode"] == "ensemble":
-        email_result = email_runtime["module"].predict_from_parts(subject, body, sender=sender)
-        spam_probability = float(email_result["spam_probability"])
-        ml_indicators.extend(
-            [
-                "Email ensemble runtime: LightGBM + XGBoost.",
-                *[
-                    indicator
-                    for indicator in email_result.get("indicators", [])
-                    if isinstance(indicator, str) and indicator.strip()
-                ],
-            ]
-        )
-    else:
-        vectorizer = email_runtime["vectorizer"]
-        classifier = email_runtime["classifier"]
-        if not hasattr(classifier, "predict_proba"):
-            raise HTTPException(status_code=500, detail="Loaded classifier does not support predict_proba.")
-
-        features = vectorizer.transform([cleaned_text])
-        class_probabilities = classifier.predict_proba(features)[0]
-        spam_index = resolve_spam_class_index(classifier, email_runtime.get("label_map", {}))
-        spam_index = min(max(spam_index, 0), len(class_probabilities) - 1)
-        spam_probability = float(class_probabilities[spam_index])
-        ml_indicators.append(f"Legacy email classifier runtime: {type(classifier).__name__}.")
+    email_result = email_runtime["module"].predict_from_parts(subject, body, sender=sender)
+    spam_probability = float(email_result["spam_probability"])
+    runtime_description = email_runtime.get("artifacts", {})
+    runtime_model_name = runtime_description.get("model_type") or runtime_description.get("model_name") or "EmailModel"
+    ml_indicators.extend(
+        [
+            f"Email runtime model: {runtime_model_name}.",
+            *[
+                indicator
+                for indicator in email_result.get("indicators", [])
+                if isinstance(indicator, str) and indicator.strip()
+            ],
+        ]
+    )
 
     header_analysis = analyze_headers(
         sender,
@@ -2574,49 +2514,30 @@ def analyze_content(
     }
 
 
-def load_model_artifact() -> dict[str, Any]:
-    """Load and validate the serialized model artifact."""
-    if not MODEL_PATH.is_file():
-        raise RuntimeError(f"Model file not found: {MODEL_PATH.resolve()}")
-
-    artifact = joblib.load(MODEL_PATH)
-    required_keys = {"vectorizer", "classifier", "label_map"}
-    missing_keys = required_keys.difference(artifact.keys())
-    if missing_keys:
-        missing = ", ".join(sorted(missing_keys))
-        raise RuntimeError(f"Invalid model artifact. Missing keys: {missing}")
-
-    return artifact
-
-
 def load_email_runtime() -> dict[str, Any]:
-    """Prefer the dedicated Email ensemble; fall back to the legacy backend artifact."""
-    if email_predict_module is not None:
-        try:
-            email_predict_module.load_email_artifacts(verbose=False)
-            return {
-                "mode": "ensemble",
-                "module": email_predict_module,
-                "threshold": DEFAULT_THRESHOLD,
-                "artifacts": (
-                    email_predict_module.describe_loaded_artifacts()
-                    if hasattr(email_predict_module, "describe_loaded_artifacts")
-                    else {}
-                ),
-            }
-        except Exception as exc:
-            ensemble_error = str(exc)
-    else:
-        ensemble_error = EMAIL_PREDICT_IMPORT_ERROR or "Email ensemble module unavailable."
+    """Load the dedicated Email runtime and fail fast on artifact drift."""
+    if email_predict_module is None:
+        raise RuntimeError(EMAIL_PREDICT_IMPORT_ERROR or "Email runtime module unavailable.")
 
-    artifact = load_model_artifact()
+    if not hasattr(email_predict_module, "load_email_artifacts"):
+        raise RuntimeError("Email runtime module is missing load_email_artifacts(); refusing legacy fallback.")
+
+    email_predict_module.load_email_artifacts(verbose=False)
+    artifact_description = (
+        email_predict_module.describe_loaded_artifacts()
+        if hasattr(email_predict_module, "describe_loaded_artifacts")
+        else {}
+    )
+    model_type = str(artifact_description.get("model_type", "") or "")
+    if model_type and model_type != "LogisticRegression":
+        raise RuntimeError(
+            f"Email runtime must serve LogisticRegression from best_model.pkl, but loaded {model_type}."
+        )
     return {
-        "mode": "legacy",
-        "vectorizer": artifact["vectorizer"],
-        "classifier": artifact["classifier"],
-        "label_map": artifact.get("label_map", {0: "ham", 1: "spam"}),
-        "threshold": float(artifact.get("threshold", DEFAULT_THRESHOLD)),
-        "fallback_reason": ensemble_error,
+        "mode": "dedicated",
+        "module": email_predict_module,
+        "threshold": DEFAULT_THRESHOLD,
+        "artifacts": artifact_description,
     }
 
 
@@ -2628,11 +2549,19 @@ def load_file_model_artifacts() -> dict[str, Any]:
 
     model_entries: list[dict[str, Any]] = []
     for model_path in sorted(FILE_MODELS_DIR.glob("*_model.pkl")):
+        model_name = model_path.stem.replace("_model", "")
+        if "xgboost" in model_name.lower() or "xgb" in model_name.lower():
+            loaded_model = load_xgboost_model(
+                ubj_path=model_path.with_suffix(".ubj"),
+                pickle_path=model_path,
+            )
+        else:
+            loaded_model = joblib.load(model_path)
         model_entries.append(
             {
-                "name": model_path.stem.replace("_model", ""),
+                "name": model_name,
                 "path": str(model_path),
-                "model": joblib.load(model_path),
+                "model": loaded_model,
             }
         )
 
@@ -2641,6 +2570,9 @@ def load_file_model_artifacts() -> dict[str, Any]:
 
     scaler_path = FILE_MODELS_DIR / "feature_scaler.pkl"
     scaler = joblib.load(scaler_path) if scaler_path.is_file() else None
+    # NOTE: current FILE validation is label-stratified only. The runtime
+    # artifacts do not carry malware-family metadata, so unseen-family
+    # generalization still needs to be validated offline before deployment.
     kmeans_entry = next((entry for entry in model_entries if "kmeans" in entry["name"].lower()), None)
     return {
         "models": model_entries,
@@ -2719,7 +2651,14 @@ def load_url_model_artifacts() -> dict[str, Any]:
     skipped_models: list[dict[str, str]] = []
     for model_path in sorted(URL_MODELS_DIR.glob("*_model.pkl")):
         try:
-            loaded_model = joblib.load(model_path)
+            model_name = model_path.stem.replace("_model", "")
+            if "xgb" in model_name.lower():
+                loaded_model = load_xgboost_model(
+                    ubj_path=model_path.with_suffix(".ubj"),
+                    pickle_path=model_path,
+                )
+            else:
+                loaded_model = joblib.load(model_path)
         except Exception as exc:
             skipped_models.append(
                 {
@@ -2732,7 +2671,7 @@ def load_url_model_artifacts() -> dict[str, Any]:
 
         model_entries.append(
             {
-                "name": model_path.stem.replace("_model", ""),
+                "name": model_name,
                 "path": str(model_path),
                 "model": loaded_model,
             }
@@ -2812,15 +2751,22 @@ def extract_url_model_features(url: str) -> dict[str, Any]:
         parsed = urlparse("http://error-url.com")
 
     hostname = parsed.netloc.replace("www.", "")
+    host_without_auth = hostname.split("@")[-1]
+    host_without_port = host_without_auth.split(":")[0]
+    host_parts = [part for part in host_without_port.split(".") if part]
+    subdomain = ".".join(host_parts[:-2]) if len(host_parts) > 2 else ""
     path = parsed.path or ""
     query = parsed.query or ""
+    path_only = path
+    query_only = query
     full_url = f"{hostname}{path}"
     if query:
         full_url = f"{full_url}?{query}"
-    registered_domain = extract_registered_domain(hostname)
-    query_pairs = parse_qsl(query, keep_blank_values=True)
+    registered_domain = extract_registered_domain(host_without_port)
+    query_pairs = parse_qsl(query_only, keep_blank_values=True)
     path_analysis = analyze_url_path_segments(path)
-    has_raw_ip = int(bool(re.search(r"(\d{1,3}\.){3}\d{1,3}", hostname)))
+    has_raw_ip = int(bool(re.search(r"(\d{1,3}\.){3}\d{1,3}", host_without_port)))
+    remainder = address.split("://", 1)[1] if "://" in address else address
 
     keywords = [
         "login",
@@ -2841,6 +2787,8 @@ def extract_url_model_features(url: str) -> dict[str, Any]:
     ]
     trash_tld = (".tk", ".xyz", ".cc", ".top", ".pw", ".online", ".site", ".biz")
     popular_tld = (".com", ".net", ".org", ".co", ".edu", ".gov", ".info", ".edu.vn")
+    path_tld_markers = (".com", ".net", ".org", ".io")
+    brand_keywords = ["google", "paypal", "apple", "microsoft", "amazon", "bank", "secure", "login", "verify"]
 
     return {
         "registered_domain": registered_domain,
@@ -2853,18 +2801,23 @@ def extract_url_model_features(url: str) -> dict[str, Any]:
         "underscore_count": full_url.count("_"),
         "digit_ratio": len(re.findall(r"\d", full_url)) / (len(full_url) + 1),
         "entropy": round(calculate_string_entropy(full_url), 6),
-        "is_trash_tld": int(hostname.endswith(trash_tld)),
-        "is_popular_tld": int(any(hostname.endswith(tld) for tld in popular_tld)),
+        "is_trash_tld": int(host_without_port.endswith(trash_tld)),
+        "is_popular_tld": int(any(host_without_port.endswith(tld) for tld in popular_tld)),
         "has_ip": has_raw_ip,
         "has_raw_ip": has_raw_ip,
         "is_exec": int(bool(re.search(r"\.(exe|apk|msi|bin|js|vbs|scr|zip)$", path))),
         "keyword_count": sum(1 for keyword in keywords if keyword in full_url),
-        "subdomain_count": len(hostname.split(".")) - 2 if len(hostname.split(".")) > 2 else 0,
+        "subdomain_count": len(host_parts) - 2 if len(host_parts) > 2 else 0,
         "special_ratio": sum(full_url.count(char) for char in ["-", ".", "_", "@", "?", "&", "="]) / (len(full_url) + 1),
         "has_number_in_host": int(any(char.isdigit() for char in hostname)),
+        "has_at_symbol": int("@" in normalized),
         "is_https": int(parsed.scheme == "https"),
-        "path_depth": len([segment for segment in path.split("/") if segment]),
+        "path_depth": path_only.count("/"),
+        "has_redirect": int("//" in remainder),
+        "brand_in_subdomain": int(any(brand in subdomain for brand in brand_keywords)),
+        "tld_in_path": int(any(marker in path_only for marker in path_tld_markers)),
         "query_param_count": len(query_pairs),
+        "has_hex_encoding": int("%" in address),
         "percent_encoding_count": query.count("%"),
         "hostname_token_count": len([token for token in re.split(r"[^a-z0-9]+", hostname) if token]),
         "path_token_count": len([token for token in re.split(r"[^a-z0-9]+", path) if token]),
@@ -3083,15 +3036,6 @@ def build_model_input(model: Any, base_frame: pd.DataFrame, scaler: Any = None) 
         model_input = model_input.to_numpy()
 
     return model_input
-
-
-def build_consensus_verdict(harmful_votes: int, total_models: int) -> str:
-    """Turn model votes into a frontend-friendly verdict."""
-    if total_models <= 0 or harmful_votes <= 0:
-        return "HAM"
-    if harmful_votes >= max(1, (total_models // 2) + 1):
-        return "THREAT"
-    return "SUSPICIOUS"
 
 
 def build_consensus_classification(verdict: str, analysis_type: str) -> str:
@@ -3321,104 +3265,6 @@ def compute_file_trust_adjustment(filename: str, features: dict[str, Any], harmf
     return 1.0, None
 
 
-def compute_url_phishing_floor(url: str, features: dict[str, Any]) -> tuple[float, str | None]:
-    """Raise the minimum URL risk when classic phishing traits are present."""
-    address = str(url or "").strip().lower()
-    parsed = urlparse(address if "://" in address else f"http://{address}")
-    host = parsed.netloc.split("@")[-1].split(":")[0].replace("www.", "")
-
-    brand_hits = sorted([brand for brand in TRUSTED_BRAND_KEYWORDS if brand and brand in address])
-    host_is_trusted = bool(
-        host
-        and (domain_matches_any_suffix(host, TRUSTED_OFFICIAL_DOMAINS) or host.endswith((".gov", ".mil", ".gov.vn")))
-    )
-    brand_mismatch = bool(brand_hits) and not host_is_trusted
-    is_trash_tld = int(features.get("is_trash_tld", 0)) == 1
-    has_ip = int(features.get("has_ip", 0)) == 1
-    keyword_count = int(features.get("keyword_count", 0))
-    dash_count = int(features.get("dash_count", 0))
-
-    if has_ip:
-        return 78.0, "Raw-IP hostname heuristic increased risk for this URL."
-
-    if is_trash_tld and brand_mismatch and keyword_count >= 2:
-        return 64.0, "Brand-impersonation and disposable-TLD heuristics increased risk for this URL."
-
-    if brand_mismatch and (keyword_count >= 3 or dash_count >= 3):
-        return 56.0, "Brand-impersonation heuristics increased risk for this URL."
-
-    if is_trash_tld and keyword_count >= 3:
-        return 54.0, "Disposable-TLD and phishing-keyword heuristics increased risk for this URL."
-
-    return 0.0, None
-
-
-def compute_url_trust_adjustment(url: str, features: dict[str, Any], harmful_votes: int, total_models: int) -> tuple[float, str | None]:
-    """Dampen minority-vote risk for clearly trusted, structurally clean domains."""
-    address = str(url or "").strip().lower()
-    parsed = urlparse(address if "://" in address else f"http://{address}")
-    host = parsed.netloc.split("@")[-1].split(":")[0].replace("www.", "")
-    is_trusted_host = host and (
-        domain_matches_any_suffix(host, TRUSTED_OFFICIAL_DOMAINS) or host.endswith((".gov", ".mil", ".gov.vn"))
-    )
-    majority_votes = max(1, (total_models // 2) + 1)
-    has_clean_structure = (
-        int(features.get("is_trash_tld", 0)) == 0
-        and int(features.get("has_ip", 0)) == 0
-        and int(features.get("is_exec", 0)) == 0
-        and int(features.get("has_number_in_host", 0)) == 0
-        and int(features.get("keyword_count", 0)) == 0
-        and int(features.get("subdomain_count", 0)) <= 2
-        and int(features.get("query_param_count", 0)) <= 2
-        and int(features.get("percent_encoding_count", 0)) == 0
-    )
-    has_clean_resource_id_shape = (
-        int(features.get("is_https", 0)) == 1
-        and float(features.get("registered_domain_benign_rate", 0.5)) >= 0.6
-        and (
-            int(features.get("has_single_resource_id_path", 0)) == 1
-            or int(features.get("has_mixed_clean_path", 0)) == 1
-        )
-    )
-    has_clean_shared_host_slug_shape = (
-        int(features.get("is_https", 0)) == 1
-        and int(features.get("path_depth", 0)) in {2, 3}
-        and 2 <= int(features.get("path_token_count", 0)) <= 18
-        and int(features.get("query_len", 0)) == 0
-        and int(features.get("has_suspicious_file_ext", 0)) == 0
-        and int(features.get("numeric_path_segment_count", 0)) == 0
-        and float(features.get("special_ratio", 0.0)) <= 0.08
-        and int(features.get("has_mixed_clean_path", 0)) == 1
-    )
-    has_clean_academic_home_shape = (
-        int(features.get("is_https", 0)) == 1
-        and int(features.get("is_academic_domain", 0)) == 1
-        and int(features.get("path_depth", 0)) == 0
-        and int(features.get("query_len", 0)) == 0
-        and int(features.get("keyword_count", 0)) == 0
-        and int(features.get("has_suspicious_file_ext", 0)) == 0
-        and int(features.get("subdomain_count", 0)) <= 3
-        and float(features.get("registered_domain_benign_rate", 0.5)) >= 0.6
-    )
-
-    if is_trusted_host and has_clean_structure and harmful_votes < majority_votes:
-        return 0.85, f"Trusted host heuristic applied for {host}; minority-vote risk was reduced."
-    if has_clean_structure and has_clean_academic_home_shape:
-        if harmful_votes >= total_models and total_models > 0:
-            return 0.16, "Clean academic HTTPS landing-page heuristic reduced unanimous URL risk."
-        if harmful_votes < majority_votes:
-            return 0.4, "Clean academic HTTPS landing-page heuristic reduced split-vote URL risk."
-    if has_clean_structure and has_clean_resource_id_shape and harmful_votes < majority_votes:
-        return 0.38, "Clean HTTPS resource-ID path heuristic reduced split-vote URL risk."
-    if has_clean_structure and has_clean_shared_host_slug_shape:
-        if harmful_votes >= total_models and total_models > 0:
-            return 0.18, "Clean HTTPS content-slug heuristic reduced unanimous shared-host URL risk."
-        if harmful_votes < majority_votes:
-            return 0.42, "Clean HTTPS content-slug heuristic reduced split-vote shared-host URL risk."
-
-    return 1.0, None
-
-
 def analyze_uploaded_file_content(filename: str, raw_bytes: bytes) -> dict[str, Any]:
     """Run all FILE models and return a normalized API payload."""
     artifacts = load_file_model_artifacts()
@@ -3531,9 +3377,7 @@ def analyze_uploaded_file_content(filename: str, raw_bytes: bytes) -> dict[str, 
 
 def analyze_url_content(url: str) -> dict[str, Any]:
     """Run all URL models and return a normalized API payload."""
-    cleaned_url = str(url).strip()
-    if not cleaned_url:
-        raise HTTPException(status_code=400, detail="URL must not be empty.")
+    cleaned_url = validate_user_supplied_url(url)
 
     artifacts = load_url_model_artifacts()
     features = enrich_url_features_with_domain_stats(extract_url_model_features(cleaned_url), artifacts.get("domain_stats"))
@@ -3548,11 +3392,16 @@ def analyze_url_content(url: str) -> dict[str, Any]:
         model = entry["model"]
         model_name = entry["name"]
         feature_names = artifacts["feature_names_xgb"] if model_name == "xgb" and artifacts["feature_names_xgb"] else artifacts["feature_names"]
-        scaler = artifacts["scaler_xgb"] if model_name == "xgb" and artifacts["scaler_xgb"] is not None else None
+        if model_name == "xgb":
+            scaler = artifacts["scaler_xgb"] if artifacts["scaler_xgb"] is not None else artifacts["scaler"]
+        elif model_name in {"lgbm", "lightgbm"}:
+            scaler = artifacts["scaler"]
+        else:
+            scaler = None
         ordered_frame = feature_frame[feature_names]
         model_input = build_model_input(model, ordered_frame, scaler=scaler)
         raw_prediction = model.predict(model_input)[0]
-        label, is_malicious = normalize_url_prediction(raw_prediction, artifacts["label_encoder"])
+        raw_label, raw_is_malicious = normalize_url_prediction(raw_prediction, artifacts["label_encoder"])
         harm_probability = extract_positive_class_probability(
             model,
             model_input,
@@ -3566,6 +3415,8 @@ def analyze_url_content(url: str) -> dict[str, Any]:
             display_confidence = adjusted_harm_probability if is_malicious else 1.0 - adjusted_harm_probability
             confidence_values.append(adjusted_harm_probability)
         else:
+            is_malicious = raw_is_malicious
+            label = raw_label
             display_confidence = harm_probability
 
         if is_malicious:
@@ -3574,6 +3425,12 @@ def analyze_url_content(url: str) -> dict[str, Any]:
         model_results.append(
             {
                 "model": entry["name"],
+                "raw_prediction": raw_label,
+                "raw_is_malicious": raw_is_malicious,
+                "raw_model_score": round(harm_probability, 6) if harm_probability is not None else None,
+                "heuristic_adjusted_score": (
+                    round(adjusted_harm_probability, 6) if adjusted_harm_probability is not None else None
+                ),
                 "prediction": label,
                 "is_malicious": is_malicious,
                 "confidence": round(display_confidence, 6) if display_confidence is not None else None,
@@ -3620,6 +3477,8 @@ def analyze_url_content(url: str) -> dict[str, Any]:
         "model_results": model_results,
         "features": features,
         "score_breakdown": score_breakdown,
+        "heuristic_probability_delta": round(probability_adjustment, 6),
+        "heuristic_adjustment_notes": adjustment_notes,
         "summary": summary,
         "source_dir": artifacts["source_dir"],
     }

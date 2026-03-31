@@ -10,3 +10,9 @@ class AnalyzeTextRequest(BaseModel):
 
     subject: str = ""
     body: str = ""
+
+
+class AnalyzeUrlRequest(BaseModel):
+    """Request body for URL threat analysis."""
+
+    url: str
