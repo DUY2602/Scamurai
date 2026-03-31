@@ -1,6 +1,7 @@
 import os
 import sys
 import warnings
+from collections import Counter
 
 import joblib
 import numpy as np
@@ -19,6 +20,19 @@ MODEL_SPECS = [
     ("XGB", "xgboost_malware_model.pkl", False),
     ("KMeans", "kmeans_malware_model.pkl", True),
 ]
+FILE_FEATURE_COLUMNS = [
+    "Sections",
+    "AvgEntropy",
+    "MaxEntropy",
+    "SuspiciousSections",
+    "DLLs",
+    "Imports",
+    "HasSensitiveAPI",
+    "ImageBase",
+    "SizeOfImage",
+    "HasVersionInfo",
+]
+REFERENCE_BENIGN_BINARIES = ("notepad.exe", "calc.exe", "cmd.exe")
 
 
 def _load_pickle(filename):
@@ -32,20 +46,80 @@ def load_artifacts():
     if not os.path.exists(MODELS_FOLDER):
         raise FileNotFoundError(f"Folder not found: {MODELS_FOLDER}")
 
-    return {
-        "models": {
-            display_name: _load_pickle(filename)
-            for display_name, filename, _ in MODEL_SPECS
-        },
-        "feature_scaler": _load_pickle("feature_scaler.pkl"),
+    models = {
+        display_name: _load_pickle(filename)
+        for display_name, filename, _ in MODEL_SPECS
     }
+    feature_scaler = _load_pickle("feature_scaler.pkl")
 
-
-ARTIFACTS = load_artifacts()
-
+    return {
+        "models": models,
+        "feature_scaler": feature_scaler,
+        "kmeans_cluster_to_label": _infer_kmeans_cluster_mapping(
+            models.get("KMeans"),
+            feature_scaler,
+        ),
+    }
 
 def _prediction_to_label(prediction):
     return "MALWARE" if int(prediction) == 1 else "BENIGN"
+
+
+def _build_feature_dataframe(X_raw):
+    import pandas as pd
+
+    return pd.DataFrame(np.array(X_raw, dtype=float), columns=FILE_FEATURE_COLUMNS)
+
+
+def _centroid_malware_score(center):
+    sections, avg_entropy, max_entropy, suspicious_sections, dlls, imports, has_sensitive_api, _, _, has_version = center
+    return (
+        (avg_entropy * 2.0)
+        + max_entropy
+        + (suspicious_sections * 1.5)
+        + (has_sensitive_api * 1.5)
+        - (dlls * 0.05)
+        - (imports * 0.01)
+        - (has_version * 1.25)
+        - (sections * 0.05)
+    )
+
+
+def _infer_kmeans_cluster_mapping(kmeans_model, scaler):
+    if kmeans_model is None or scaler is None or not hasattr(kmeans_model, "cluster_centers_"):
+        return {0: 0, 1: 1}
+
+    benign_cluster_votes = []
+    system_root = os.environ.get("SystemRoot", r"C:\Windows")
+    for binary_name in REFERENCE_BENIGN_BINARIES:
+        candidate_path = os.path.join(system_root, "System32", binary_name)
+        if not os.path.exists(candidate_path):
+            continue
+
+        features = extract_features(candidate_path, label=None)
+        if not features:
+            continue
+
+        feature_frame = _build_feature_dataframe([features[1:-1]])
+        cluster_id = int(kmeans_model.predict(scaler.transform(feature_frame))[0])
+        benign_cluster_votes.append(cluster_id)
+
+    if benign_cluster_votes:
+        benign_cluster = Counter(benign_cluster_votes).most_common(1)[0][0]
+        return {int(cluster): (0 if int(cluster) == benign_cluster else 1) for cluster in range(kmeans_model.n_clusters)}
+
+    original_centers = scaler.inverse_transform(kmeans_model.cluster_centers_)
+    ranked_clusters = sorted(
+        range(kmeans_model.n_clusters),
+        key=lambda cluster_id: _centroid_malware_score(original_centers[cluster_id]),
+        reverse=True,
+    )
+    mapping = {cluster_id: 0 for cluster_id in range(kmeans_model.n_clusters)}
+    mapping[ranked_clusters[0]] = 1
+    return mapping
+
+
+ARTIFACTS = load_artifacts()
 
 
 def _format_confidence(model, model_input):
@@ -81,6 +155,8 @@ def predict_file(file_path):
         model = ARTIFACTS["models"][display_name]
         model_input = X_scaled if use_scaled_features else X_raw
         pred = model.predict(model_input)[0]
+        if display_name == "KMeans":
+            pred = ARTIFACTS["kmeans_cluster_to_label"].get(int(pred), int(pred))
         predictions[display_name] = {
             "prediction": _prediction_to_label(pred),
             "confidence": _format_confidence(model, model_input),

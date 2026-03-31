@@ -108,6 +108,7 @@ def extract_features(url: str) -> dict[str, object]:
     registered_domain = extract_registered_domain(hostname)
     query_pairs = parse_qsl(query, keep_blank_values=True)
     path_analysis = analyze_path_segments(path)
+    has_raw_ip = int(bool(re.search(r"(\d{1,3}\.){3}\d{1,3}", hostname)))
 
     return {
         "normalized_url": normalized_url,
@@ -124,7 +125,8 @@ def extract_features(url: str) -> dict[str, object]:
         "entropy": get_entropy(full_url),
         "is_trash_tld": int(hostname.endswith(TRASH_TLDS)),
         "is_popular_tld": int(any(hostname.endswith(tld) for tld in POPULAR_TLDS)),
-        "has_ip": int(bool(re.search(r"(\d{1,3}\.){3}\d{1,3}", hostname))),
+        "has_ip": has_raw_ip,
+        "has_raw_ip": has_raw_ip,
         "is_exec": int(bool(re.search(r"\.(exe|apk|msi|bin|js|vbs|scr|zip)$", path))),
         "keyword_count": sum(1 for keyword in SUSPICIOUS_KEYWORDS if keyword in full_url),
         "subdomain_count": max(0, len([part for part in hostname.split(".") if part]) - 2),
