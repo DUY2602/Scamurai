@@ -39,8 +39,9 @@ export default function DonutChart({ data }) {
       .append("text")
       .attr("text-anchor", "middle")
       .attr("y", -4)
-      .attr("fill", "#C8DCEE")
+      .attr("fill", "#F4FAFF")
       .style("font-size", "28px")
+      .style("font-weight", "700")
       .style("font-family", "Orbitron, monospace")
       .text(total);
 
@@ -48,8 +49,9 @@ export default function DonutChart({ data }) {
       .append("text")
       .attr("text-anchor", "middle")
       .attr("y", 18)
-      .attr("fill", "rgba(200,220,238,.62)")
+      .attr("fill", "rgba(240,248,255,.88)")
       .style("font-size", "11px")
+      .style("font-weight", "600")
       .style("letter-spacing", "1.8px")
       .style("font-family", "JetBrains Mono, monospace")
       .text("TOTAL EVENTS");
@@ -61,8 +63,9 @@ export default function DonutChart({ data }) {
       .append("text")
       .attr("transform", (d) => `translate(${labelArc.centroid(d)})`)
       .attr("text-anchor", "middle")
-      .attr("fill", "#020812")
+      .attr("fill", "#F8FCFF")
       .style("font-size", "10px")
+      .style("font-weight", "700")
       .style("font-family", "JetBrains Mono, monospace")
       .text((d) => d.data.value);
   }, [data]);

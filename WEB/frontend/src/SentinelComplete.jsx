@@ -1,6 +1,6 @@
 ﻿import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
-import DashboardPreview from "./dashboard/DashboardPreview.jsx";
+import DashboardPage from "./dashboard/DashboardPage.jsx";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 
@@ -575,6 +575,7 @@ const EMPTY_ANALYSIS = {
 
 const ANALYZER_MODES = [
   { id: "email", label: "EMAIL", icon: "✉️" },
+  { id: "text", label: "TEXT", icon: "📝" },
   { id: "url", label: "URL", icon: "🌐" },
   { id: "file", label: "FILE", icon: "🧩" },
 ];
@@ -587,10 +588,22 @@ const MODEL_META = {
     accent: "#00E5FF",
     accentSoft: "rgba(0,229,255,.18)",
     glow: "rgba(0,229,255,.16)",
-    description: "Phan tich email bang model cua WEEK-6 kem header forensics, URL extraction, language heuristics va attachment signals.",
+    description: "Analyze uploaded email files with the Week-6 model, header forensics, URL extraction, language heuristics, and attachment signals.",
     source: "WEEK-6 / spam_model.joblib",
-    helper: "Dung khi can kiem tra .eml, .msg hoac noi dung email da paste.",
+    helper: "Use this page to inspect uploaded .eml, .msg, or .txt email files.",
     chips: ["WEEK-6 Model", "Header Analysis", "URL Extraction"],
+  },
+  text: {
+    title: "Text Email Analysis",
+    shortTitle: "TEXT",
+    icon: "📝",
+    accent: "#7C3AED",
+    accentSoft: "rgba(124,58,237,.18)",
+    glow: "rgba(124,58,237,.16)",
+    description: "Analyze pasted email subject and body text through the analyze-text endpoint to return spam probability, language signals, and lightweight forensics.",
+    source: "FastAPI / analyze-text",
+    helper: "Use this page when you only have the subject and body and need a quick text-only review.",
+    chips: ["Manual Input", "Subject + Body", "Language Signals"],
   },
   url: {
     title: "URL Reputation",
@@ -599,9 +612,9 @@ const MODEL_META = {
     accent: "#00FFA3",
     accentSoft: "rgba(0,255,163,.18)",
     glow: "rgba(0,255,163,.16)",
-    description: "Phan tich URL bang cac model trong thu muc URL/models va hien thi ensemble vote, lexical features va risk summary.",
+    description: "Analyze suspicious links with the models stored in URL/models and review ensemble votes, lexical features, and the final risk summary.",
     source: "URL / models",
-    helper: "Dung khi can scan nhanh mot link, domain, redirect path hoac URL nghi ngo.",
+    helper: "Use this page for a fast scan of a URL, domain, redirect path, or suspicious link.",
     chips: ["URL Models", "Lexical Features", "Model Ensemble"],
   },
   file: {
@@ -611,12 +624,19 @@ const MODEL_META = {
     accent: "#FF4D6D",
     accentSoft: "rgba(255,77,109,.18)",
     glow: "rgba(255,77,109,.16)",
-    description: "Phan tich file executable bang cac model trong FILE/models, trich xuat PE features va vote malware/benign.",
+    description: "Analyze executable files with the models in FILE/models, extract PE features, and compare malware versus benign votes.",
     source: "FILE / models",
-    helper: "Dung khi can kiem tra .exe, .dll, .scr, .msi va cac file PE nghi ngo.",
+    helper: "Use this page for suspicious .exe, .dll, .scr, .msi, and other PE-format files.",
     chips: ["PE Features", "Malware Vote", "Static Analysis"],
   },
 };
+
+const TOPIC_PAGES = [
+  { id: "email", label: "EMAIL", accent: "#00E5FF" },
+  { id: "text", label: "TEXT", accent: "#7C3AED" },
+  { id: "url", label: "URL", accent: "#00FFA3" },
+  { id: "file", label: "FILE", accent: "#FF4D6D" },
+];
 
 const normalizeVerdict = (verdict) => {
   const key = String(verdict || "").trim().toUpperCase();
@@ -981,9 +1001,9 @@ const Testimonial=({quote,name,role,company,delay=0})=>(<div className="fade-in 
 ═══════════════════════════════════════════════════════════════ */
 const Nav = ({page, setPage, scrollY}) => {
   const scrolled = scrollY > 60;
-  const isApp = page === "app";
+  const isAppLike = page !== "landing";
   return (
-    <motion.nav style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,padding:"0 5%",height:70,display:"flex",alignItems:"center",justifyContent:"space-between",background:isApp?"rgba(2,8,18,.95)":scrolled?"rgba(2,8,18,.88)":"transparent",borderBottom:scrolled||isApp?"1px solid rgba(0,255,65,.1)":"1px solid transparent",backdropFilter:scrolled||isApp?"blur(18px)":"none",transition:"all .4s ease"}}>
+    <motion.nav style={{position:"fixed",top:0,left:0,right:0,zIndex:1000,padding:"0 5%",height:70,display:"flex",alignItems:"center",justifyContent:"space-between",background:isAppLike?"rgba(2,8,18,.95)":scrolled?"rgba(2,8,18,.88)":"transparent",borderBottom:scrolled||isAppLike?"1px solid rgba(0,255,65,.1)":"1px solid transparent",backdropFilter:scrolled||isAppLike?"blur(18px)":"none",transition:"all .4s ease"}}>
       <div style={{display:"flex",alignItems:"center",gap:10,cursor:"none"}} onClick={()=>setPage("landing")}>
         <div style={{width:32,height:32,borderRadius:6,border:"1px solid rgba(0,255,65,.4)",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,255,65,.08)"}}>
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#00FF41" strokeWidth="1"/><circle cx="8" cy="8" r="3" stroke="#00FF41" strokeWidth="1" opacity=".5"/><line x1="8" y1="2" x2="8" y2="8" stroke="#00FF41" strokeWidth="1.5"/></svg>
@@ -992,15 +1012,19 @@ const Nav = ({page, setPage, scrollY}) => {
         <span className="f-mono" style={{color:"rgba(0,255,65,.4)",fontSize:10,letterSpacing:1.2,marginTop:2}}>v2.0</span>
       </div>
       <div style={{display:"flex",gap:8,alignItems:"center"}}>
-        {isApp ? (
-          <button onClick={()=>setPage("landing")} className="f-mono" style={{background:"transparent",border:"1px solid rgba(0,255,65,.3)",color:"rgba(0,255,65,.7)",padding:"9px 18px",borderRadius:4,fontSize:12,letterSpacing:1.1,cursor:"none",display:"flex",alignItems:"center",gap:8,transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(0,255,65,.7)"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(0,255,65,.3)"}>← BACK TO HOME</button>
-        ) : (
-          <>
-            {["Features","How It Works","Pricing"].map(l=>(<a key={l} href={`#${l.toLowerCase().replace(/ /g,"-")}`} className="f-mono" style={{color:"rgba(200,220,238,.66)",fontSize:13,letterSpacing:1.1,transition:"color .2s",textDecoration:"none"}} onMouseEnter={e=>e.target.style.color="#00FF41"} onMouseLeave={e=>e.target.style.color="rgba(200,220,238,.66)"}>{l}</a>))}
-            <button onClick={()=>setPage("app")} className="f-orb" style={{marginLeft:16,background:"rgba(0,255,65,.12)",border:"1px solid rgba(0,255,65,.5)",color:"#00FF41",padding:"9px 22px",borderRadius:4,fontSize:12,letterSpacing:1.2,cursor:"none",transition:"all .2s",boxShadow:"0 0 20px rgba(0,255,65,.1)"}} onMouseEnter={e=>{e.target.style.background="rgba(0,255,65,.22)";e.target.style.boxShadow="0 0 30px rgba(0,255,65,.25)";}} onMouseLeave={e=>{e.target.style.background="rgba(0,255,65,.12)";e.target.style.boxShadow="0 0 20px rgba(0,255,65,.1)";}}>ANALYZE EMAIL</button>
-          </>
-        )}
-        {isApp && (
+        <button onClick={()=>setPage("landing")} className="f-mono" style={{background:"transparent",border:"1px solid rgba(0,255,65,.3)",color:page==="landing"?"#00FF41":"rgba(0,255,65,.7)",padding:"9px 14px",borderRadius:4,fontSize:12,letterSpacing:1.1,cursor:"none",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(0,255,65,.7)"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(0,255,65,.3)"}>HOME</button>
+        {TOPIC_PAGES.map(({ id, label, accent }) => (
+          <button
+            key={id}
+            onClick={() => setPage(id)}
+            className="f-mono"
+            style={{background:page===id?`${accent}16`:"transparent",border:`1px solid ${page===id?accent:"rgba(200,220,238,.12)"}`,color:page===id?accent:"rgba(200,220,238,.7)",padding:"9px 14px",borderRadius:4,fontSize:12,letterSpacing:1.1,cursor:"none",transition:"all .2s"}}
+          >
+            {label}
+          </button>
+        ))}
+        <button onClick={()=>setPage("dashboard")} className="f-mono" style={{background:page==="dashboard"?"rgba(0,229,255,.12)":"transparent",border:"1px solid rgba(0,229,255,.25)",color:page==="dashboard"?"#00E5FF":"rgba(0,229,255,.82)",padding:"9px 14px",borderRadius:4,fontSize:12,letterSpacing:1.1,cursor:"none",transition:"all .2s"}} onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(0,229,255,.55)"} onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(0,229,255,.25)"}>DASHBOARD</button>
+        {isAppLike && (
           <div style={{display:"flex",alignItems:"center",gap:6,padding:"6px 14px",borderRadius:6,background:"rgba(0,229,255,.05)",border:"1px solid rgba(0,229,255,.18)"}}>
             <div style={{width:6,height:6,borderRadius:"50%",background:"#00FFA3",boxShadow:"0 0 6px #00FFA3",animation:"pulse-ring 2s ease-in-out infinite"}}/>
             <span className="f-mono" style={{fontSize:10,color:"rgba(0,255,163,.7)",letterSpacing:1.2}}>ONLINE</span>
@@ -1014,179 +1038,53 @@ const Nav = ({page, setPage, scrollY}) => {
 /* ═══════════════════════════════════════════════════════════════
    LANDING PAGE
 ═══════════════════════════════════════════════════════════════ */
-const LandingPage = ({mx, my, goToApp}) => (
+const LandingPage = ({mx, my, setPage}) => (
   <div style={{position:"relative",zIndex:1}}>
-    {/* Hero */}
     <section style={{minHeight:"100vh",display:"flex",alignItems:"center",padding:"80px 5% 40px"}}>
       <div style={{flex:1,maxWidth:560}}>
         <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:.6}} className="f-mono" style={{color:"rgba(0,255,65,.6)",fontSize:12,letterSpacing:3.2,marginBottom:22,display:"flex",alignItems:"center",gap:8}}>
           <span style={{width:6,height:6,borderRadius:"50%",background:"#00FF41",display:"inline-block",animation:"blink 1.2s ease-in-out infinite"}}/>
-          AI-POWERED EMAIL THREAT DETECTION
+          MULTI-TOPIC ANALYSIS WORKSPACE
         </motion.div>
         <motion.h1 initial={{opacity:0,y:30}} animate={{opacity:1,y:0}} transition={{duration:.7,delay:.1}} className="f-orb" style={{fontSize:"clamp(36px,4.5vw,62px)",fontWeight:900,lineHeight:1.1,letterSpacing:-1,marginBottom:24}}>
-          <span style={{color:"#C8DCEE"}}>DETECT THREATS</span><br/>
-          <span className="shimmer-text">BEFORE THEY STRIKE</span>
+          <span style={{color:"#C8DCEE"}}>Choose one topic</span><br/>
+          <span className="shimmer-text">and analyze deeply</span>
         </motion.h1>
         <motion.p initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:.6,delay:.2}} style={{color:"rgba(200,220,238,.7)",fontSize:18,lineHeight:1.8,marginBottom:38,maxWidth:520}}>
-          Sentinel uses military-grade sonar intelligence to scan every email in real-time — detecting phishing, malware, spoofing, and zero-day exploits before they reach your inbox.
+          The frontend is now split into dedicated pages for email files, pasted email text, suspicious URLs, and executable files. Each topic has its own focused input flow instead of a combined analyzer screen.
         </motion.p>
-        <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:.6,delay:.3}} style={{display:"flex",gap:14,flexWrap:"wrap",marginBottom:48}}>
-          <button onClick={goToApp} className="f-orb" style={{padding:"15px 34px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:2.1,cursor:"none",background:"rgba(0,255,65,.14)",border:"1px solid rgba(0,255,65,.5)",color:"#00FF41",boxShadow:"0 0 30px rgba(0,255,65,.15)",transition:"all .25s"}} onMouseEnter={e=>{e.target.style.background="rgba(0,255,65,.26)";e.target.style.boxShadow="0 0 50px rgba(0,255,65,.3)";}} onMouseLeave={e=>{e.target.style.background="rgba(0,255,65,.14)";e.target.style.boxShadow="0 0 30px rgba(0,255,65,.15)";}}>START FREE TRIAL</button>
-          <button onClick={goToApp} className="f-orb" style={{padding:"15px 34px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:2.1,cursor:"none",background:"transparent",border:"1px solid rgba(200,220,238,.2)",color:"rgba(200,220,238,.7)",transition:"all .25s"}} onMouseEnter={e=>{e.target.style.borderColor="rgba(0,229,255,.4)";e.target.style.color="#00E5FF";}} onMouseLeave={e=>{e.target.style.borderColor="rgba(200,220,238,.2)";e.target.style.color="rgba(200,220,238,.7)";}}>VIEW LIVE DEMO</button>
-        </motion.div>
-        <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{duration:.6,delay:.5}} style={{display:"flex",gap:24,alignItems:"center",flexWrap:"wrap"}}>
-          {["SOC2 CERTIFIED","GDPR COMPLIANT","ISO 27001","ZERO LOGS"].map(b=>(<div key={b} style={{display:"flex",alignItems:"center",gap:6}}><span style={{color:"rgba(0,255,65,.5)",fontSize:9}}>◆</span><span className="f-mono" style={{color:"rgba(200,220,238,.46)",fontSize:11,letterSpacing:1.2}}>{b}</span></div>))}
+        <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:.6,delay:.3}} style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:14}}>
+          {[...TOPIC_PAGES, { id: "dashboard", label: "DASHBOARD", accent: "#00E5FF" }].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setPage(item.id)}
+              className="glass-card"
+              style={{padding:"18px 20px",textAlign:"left",border:`1px solid ${item.accent}33`,cursor:"none",background:`linear-gradient(135deg, ${item.accent}10, rgba(4,10,22,.94))`,transition:"all .25s"}}
+            >
+              <div className="f-mono" style={{fontSize:11,color:item.accent,letterSpacing:2.1}}>{item.label}</div>
+              <div className="f-syne" style={{fontSize:14,color:"rgba(200,220,238,.7)",lineHeight:1.7,marginTop:10}}>
+                {item.id==="email" ? "Upload .eml or email files for full forensic analysis."
+                  : item.id==="text" ? "Paste subject and body text for quick email screening."
+                  : item.id==="url" ? "Scan one suspicious link with the URL models."
+                  : item.id==="file" ? "Upload executable files for malware-oriented static checks."
+                  : "Open the chart-only page for D3 telemetry and mock analytics."}
+              </div>
+            </button>
+          ))}
         </motion.div>
       </div>
       <motion.div initial={{opacity:0,scale:.9}} animate={{opacity:1,scale:1}} transition={{duration:.8,delay:.2}} style={{flex:1,display:"flex",justifyContent:"center",alignItems:"center",minWidth:0,overflow:"hidden"}}>
         <div style={{transform:"scale(0.72)",transformOrigin:"center center"}}><ThreatRadar mx={mx} my={my}/></div>
       </motion.div>
     </section>
-
     <LandingTicker/>
-
-    {/* Stats */}
-    <section style={{padding:"80px 5%"}} id="features">
-      <div style={{display:"grid",gridTemplateColumns:"repeat(4,1fr)",borderTop:"1px solid rgba(0,255,65,.1)",borderBottom:"1px solid rgba(0,255,65,.1)",background:"rgba(0,255,65,.015)"}}>
-        <Counter target={2400000000} suffix="+" label="Threats Blocked" color="#00FF41"/>
-        <Counter target={99.97} suffix="%" label="Detection Rate" color="#00E5FF"/>
-        <Counter target={50000000} suffix="+" label="Emails Scanned" color="#00FFA3"/>
-        <Counter target={140} suffix="+" label="Threat Vectors" color="#FF6B6B"/>
-      </div>
-    </section>
-
-    {/* Features */}
-    <section style={{padding:"100px 5%"}}>
-      <div className="fade-in" style={{textAlign:"center",marginBottom:64}}>
-        <div className="f-mono" style={{color:"rgba(0,255,65,.6)",fontSize:12,letterSpacing:3.2,marginBottom:14}}>◆ CAPABILITIES ◆</div>
-        <h2 className="f-orb" style={{fontSize:"clamp(30px,3.6vw,46px)",fontWeight:900,color:"#C8DCEE",letterSpacing:-1}}>MILITARY-GRADE <span style={{color:"#00FF41"}}>PROTECTION</span></h2>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:20}}>
-        <FeatureCard delay={0}   icon="⬡" color="#00FF41"  title="SONAR DETECTION"    desc="Our proprietary ping-wave algorithm maps your email landscape in real-time, detecting anomalies the instant they appear — milliseconds before delivery."/>
-        <FeatureCard delay={0.1} icon="◈" color="#00E5FF"  title="ZERO-DAY DEFENSE"   desc="AI pattern-matching trained on 50B+ threat samples identifies unknown attack vectors with 99.3% accuracy, even without prior signatures."/>
-        <FeatureCard delay={0.2} icon="◆" color="#00FFA3"  title="LINK DETONATION"    desc="Every URL is detonated in an isolated sandbox environment. Our crawler follows redirects and analyzes final destinations before you ever click."/>
-        <FeatureCard delay={0.3} icon="▲" color="red"      title="THREAT LOCKDOWN"    desc="Confirmed threats are quarantined instantly with lock-bracket isolation. Admins receive real-time alerts with full forensic analysis."/>
-        <FeatureCard delay={0.4} icon="◇" color="#00E5FF"  title="BEHAVIORAL AI"      desc="Machine learning models analyze sender behavior, timing patterns, and linguistic anomalies to detect impersonation and BEC attacks."/>
-        <FeatureCard delay={0.5} icon="⬡" color="#00FF41"  title="CONTINUOUS RADAR"   desc="24/7 persistent threat monitoring with adaptive sensitivity. The system recalibrates detection thresholds dynamically."/>
-      </div>
-    </section>
-
-    {/* How It Works */}
-    <section id="how-it-works" style={{padding:"100px 5%"}}>
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:80,alignItems:"center",maxWidth:1100,margin:"0 auto"}}>
-        <div>
-          <div className="fade-in" style={{marginBottom:48}}>
-            <div className="f-mono" style={{color:"rgba(0,255,65,.6)",fontSize:12,letterSpacing:3.2,marginBottom:14}}>◆ HOW IT WORKS ◆</div>
-            <h2 className="f-orb" style={{fontSize:"clamp(30px,3vw,42px)",fontWeight:900,color:"#C8DCEE",letterSpacing:-1,lineHeight:1.2}}>FROM INBOX TO<br/><span style={{color:"#00FF41"}}>VERDICT</span> IN 0.3ms</h2>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",gap:32}}>
-            <Step delay={0.1} num="01" title="EMAIL INTERCEPTED" desc="Every incoming email is intercepted at the MX layer before delivery. Zero latency impact — your users never notice a delay."/>
-            <Step delay={0.2} num="02" title="SONAR SCAN INITIATED" desc="Our ping-wave engine emits a detection signal across the email structure, mapping every link, attachment, header anomaly, and behavioral signature."/>
-            <Step delay={0.3} num="03" title="THREATS ECHO BACK" desc="Malicious elements echo back a unique signature. The AI classifies each echo by threat type, confidence score, and severity in real-time."/>
-            <Step delay={0.4} num="04" title="VERDICT DELIVERED" desc="Clean emails delivered instantly. Threats quarantined, logged with full forensics, and your security team alerted with actionable intelligence."/>
-          </div>
-        </div>
-        <div className="fade-in" style={{position:"relative"}}>
-          <div className="glass-lp" style={{borderRadius:12,padding:32,position:"relative",overflow:"hidden"}}>
-            <div style={{position:"absolute",top:0,left:0,right:0,height:2,background:"linear-gradient(90deg,transparent,#00FF41,transparent)",opacity:.4,animation:"scan-h 3s linear infinite"}}/>
-            <div className="f-mono" style={{color:"rgba(0,255,65,.5)",fontSize:11,letterSpacing:2.2,marginBottom:20}}>◆ LIVE ANALYSIS FEED</div>
-            {[{label:"PHISHING LINK DETECTED",val:"BLOCKED",color:"#FF6060",time:"0.12ms"},{label:"SENDER VERIFIED",val:"CLEAN",color:"#00FF41",time:"0.08ms"},{label:"ATTACHMENT SANDBOXED",val:"SCANNING",color:"#FFD60A",time:"0.31ms"},{label:"HEADER SPOOFING",val:"BLOCKED",color:"#FF6060",time:"0.09ms"},{label:"URL REPUTATION CHECK",val:"CLEAN",color:"#00FF41",time:"0.15ms"},{label:"BEHAVIORAL ANALYSIS",val:"ANOMALY",color:"#FF9500",time:"0.22ms"}].map((item,i)=>(<div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"10px 0",borderBottom:"1px solid rgba(0,255,65,.06)"}}><div style={{display:"flex",alignItems:"center",gap:10}}><span style={{width:5,height:5,borderRadius:"50%",background:item.color,flexShrink:0,boxShadow:`0 0 6px ${item.color}`}}/><span className="f-mono" style={{color:"rgba(200,220,238,.72)",fontSize:12}}>{item.label}</span></div><div style={{display:"flex",alignItems:"center",gap:12}}><span className="f-mono" style={{color:"rgba(200,220,238,.34)",fontSize:10}}>{item.time}</span><span className="f-mono" style={{color:item.color,fontSize:11,fontWeight:500,letterSpacing:1.1}}>{item.val}</span></div></div>))}
-            <div style={{marginTop:20,padding:"12px 0",display:"flex",alignItems:"center",justifyContent:"space-between"}}><span className="f-mono" style={{color:"rgba(0,255,65,.5)",fontSize:11}}>VERDICT:</span><span className="f-orb" style={{color:"#FF6060",fontSize:16,fontWeight:700,letterSpacing:2}}>⚠ THREAT DETECTED</span></div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    {/* Pricing */}
-    <section id="pricing" style={{padding:"96px 5%"}}>
-      <div className="fade-in" style={{textAlign:"center",marginBottom:64}}>
-        <div className="f-mono" style={{color:"rgba(0,255,65,.6)",fontSize:12,letterSpacing:3.2,marginBottom:14}}>◆ PRICING ◆</div>
-        <h2 className="f-orb" style={{fontSize:"clamp(30px,3.6vw,46px)",fontWeight:900,color:"#C8DCEE",letterSpacing:-1,marginBottom:16}}>DEPLOY AT THE <span style={{color:"#00FF41"}}>RIGHT SCALE</span></h2>
-        <p style={{color:"rgba(200,220,238,.58)",fontSize:17,lineHeight:1.8,maxWidth:640,margin:"0 auto"}}>Bat dau bang scan co ban, sau do mo rong len bo quy tac, quan sat mo hinh va xu ly khoi luong lon hon khi can.</p>
-      </div>
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(260px,1fr))",gap:22,maxWidth:1180,margin:"0 auto"}}>
-        <PricingCard
-          tier="Starter"
-          price="0"
-          period="/demo"
-          onStart={goToApp}
-          features={[
-            "Manual email, URL, and file scans",
-            "Core threat verdict and risk scoring",
-            "Model ensemble visibility",
-            "Great for assignment demos",
-          ]}
-        />
-        <PricingCard
-          tier="Team"
-          price="29"
-          period="/month"
-          highlight
-          onStart={goToApp}
-          features={[
-            "Shared analyst workflow",
-            "Expanded forensics and summaries",
-            "Operational model comparisons",
-            "Ready for charting and reporting",
-          ]}
-        />
-        <PricingCard
-          tier="Enterprise"
-          price="99"
-          period="/month"
-          onStart={goToApp}
-          features={[
-            "Large-scale scan operations",
-            "Historical analytics foundation",
-            "Custom dashboard integrations",
-            "Priority incident workflows",
-          ]}
-        />
-      </div>
-    </section>
-
-    {/* CTA */}
-    <section style={{padding:"80px 5%"}}>
-      <div className="fade-in" style={{borderRadius:12,padding:"60px 5%",textAlign:"center",position:"relative",overflow:"hidden",background:"rgba(0,255,65,.04)",border:"1px solid rgba(0,255,65,.2)",boxShadow:"0 0 80px rgba(0,255,65,.06),inset 0 0 60px rgba(0,255,65,.02)"}}>
-        <div style={{position:"absolute",top:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(0,255,65,.5),transparent)"}}/>
-        <div style={{position:"absolute",bottom:0,left:0,right:0,height:1,background:"linear-gradient(90deg,transparent,rgba(0,255,65,.5),transparent)"}}/>
-        <div className="f-mono" style={{color:"rgba(0,255,65,.6)",fontSize:12,letterSpacing:3.2,marginBottom:16}}>◆ START TODAY ◆</div>
-        <h2 className="f-orb" style={{fontSize:"clamp(30px,4vw,54px)",fontWeight:900,lineHeight:1.1,letterSpacing:-1,marginBottom:18}}><span style={{color:"#C8DCEE"}}>YOUR INBOX IS BEING</span><br/><span className="shimmer-text">TARGETED RIGHT NOW</span></h2>
-        <p style={{color:"rgba(200,220,238,.58)",fontSize:17,lineHeight:1.8,marginBottom:36,maxWidth:560,margin:"0 auto 36px"}}>Every second you wait, threats accumulate. Deploy Sentinel in under 5 minutes and start protecting your organization today.</p>
-        <div style={{display:"flex",gap:14,justifyContent:"center",flexWrap:"wrap"}}>
-          <button onClick={goToApp} className="f-orb" style={{padding:"16px 40px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:2,cursor:"none",background:"rgba(0,255,65,.16)",border:"1px solid rgba(0,255,65,.55)",color:"#00FF41",boxShadow:"0 0 40px rgba(0,255,65,.2)",transition:"all .25s"}} onMouseEnter={e=>{e.target.style.background="rgba(0,255,65,.28)";e.target.style.boxShadow="0 0 60px rgba(0,255,65,.35)";}} onMouseLeave={e=>{e.target.style.background="rgba(0,255,65,.16)";e.target.style.boxShadow="0 0 40px rgba(0,255,65,.2)";}}>DEPLOY SENTINEL FREE</button>
-          <button onClick={goToApp} className="f-orb" style={{padding:"16px 40px",borderRadius:4,fontSize:13,fontWeight:700,letterSpacing:2,cursor:"none",background:"transparent",border:"1px solid rgba(200,220,238,.2)",color:"rgba(200,220,238,.6)",transition:"all .25s"}} onMouseEnter={e=>{e.target.style.borderColor="rgba(0,229,255,.4)";e.target.style.color="#00E5FF";}} onMouseLeave={e=>{e.target.style.borderColor="rgba(200,220,238,.2)";e.target.style.color="rgba(200,220,238,.6)";}}>BOOK A DEMO</button>
-        </div>
-      </div>
-    </section>
-
-    {/* Footer */}
-    <footer style={{borderTop:"1px solid rgba(0,255,65,.1)",padding:"60px 5% 32px"}}>
-      <div style={{display:"grid",gridTemplateColumns:"2fr 1fr 1fr 1fr",gap:48,marginBottom:48}}>
-        <div>
-          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:16}}>
-            <div style={{width:32,height:32,borderRadius:6,border:"1px solid rgba(0,255,65,.3)",display:"flex",alignItems:"center",justifyContent:"center",background:"rgba(0,255,65,.06)"}}><svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#00FF41" strokeWidth="1"/><circle cx="8" cy="8" r="3" stroke="#00FF41" strokeWidth="1" opacity=".5"/><line x1="8" y1="2" x2="8" y2="8" stroke="#00FF41" strokeWidth="1.5"/></svg></div>
-            <span className="f-orb" style={{color:"#00FF41",fontWeight:700,fontSize:17,letterSpacing:2.2}}>SENTINEL</span>
-          </div>
-          <p style={{color:"rgba(200,220,238,.48)",fontSize:14,lineHeight:1.8,maxWidth:320}}>Military-grade AI email threat detection. Protecting organizations from phishing, malware, and zero-day attacks in real-time.</p>
-          
-        </div>
-        {[{title:"PRODUCT",links:["Features","Pricing","Changelog","Roadmap","Status"]},{title:"COMPANY",links:["About","Blog","Careers","Press","Contact"]},{title:"RESOURCES",links:["Documentation","API Reference","Security","Privacy","Terms"]}].map(col=>(<div key={col.title}><div className="f-mono" style={{color:"rgba(0,255,65,.5)",fontSize:11,letterSpacing:3.2,marginBottom:20}}>{col.title}</div><div style={{display:"flex",flexDirection:"column",gap:12}}>{col.links.map(l=>(<a key={l} href="#" className="f-mono" style={{color:"rgba(200,220,238,.48)",fontSize:13,transition:"color .2s"}} onMouseEnter={e=>e.target.style.color="#00FF41"} onMouseLeave={e=>e.target.style.color="rgba(200,220,238,.48)"}>{l}</a>))}</div></div>))}
-      </div>
-      <div style={{borderTop:"1px solid rgba(0,255,65,.08)",paddingTop:24,display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
-        <span className="f-mono" style={{color:"rgba(200,220,238,.32)",fontSize:11,letterSpacing:1.1}}>© 2026 SENTINEL SECURITY INC. ALL RIGHTS RESERVED.</span>
-        <div style={{display:"flex",gap:20}}>{["PRIVACY","TERMS","SECURITY"].map(l=>(<a key={l} href="#" className="f-mono" style={{color:"rgba(200,220,238,.32)",fontSize:11,letterSpacing:1.1,transition:"color .2s"}} onMouseEnter={e=>e.target.style.color="rgba(0,255,65,.6)"} onMouseLeave={e=>e.target.style.color="rgba(200,220,238,.32)"}>{l}</a>))}</div>
-      </div>
-    </footer>
   </div>
 );
 
 /* ═══════════════════════════════════════════════════════════════
    ANALYZER APP PAGE
 ═══════════════════════════════════════════════════════════════ */
-const AnalyzerApp = ({mx, my}) => {
-  const [mode,setMode]=useState("email");
-  const [tab,setTab]=useState("upload");
+const AnalyzerApp = ({topic}) => {
   const [file,setFile]=useState(null);
   const [subj,setSubj]=useState("");
   const [body,setBody]=useState("");
@@ -1196,33 +1094,23 @@ const AnalyzerApp = ({mx, my}) => {
   const [phase,setPhase]=useState("idle");
   const [analysis,setAnalysis]=useState(EMPTY_ANALYSIS);
   const [error,setError]=useState("");
-  const activeMeta = MODEL_META[mode];
-  const canScan = mode==="email"
-    ? (tab==="upload" ? Boolean(file) : body.trim().length>5 || subj.trim().length>0)
-    : mode==="url"
-      ? urlValue.trim().length>3
-      : Boolean(file);
-  const scanLabel = mode==="url" ? "ANALYZE URL" : mode==="file" ? "ANALYZE FILE" : "ANALYZE EMAIL";
-  const inputTitle = mode==="url" ? "URL INPUT" : mode==="file" ? "FILE INPUT" : "EMAIL INPUT";
-  const inputMeta = mode==="url"
+  const activeMeta = MODEL_META[topic];
+  const canScan = topic==="email"
+    ? Boolean(file)
+    : topic==="text"
+      ? body.trim().length>5 || subj.trim().length>0
+      : topic==="url"
+        ? urlValue.trim().length>3
+        : Boolean(file);
+  const scanLabel = topic==="url" ? "ANALYZE URL" : topic==="file" ? "ANALYZE FILE" : topic==="text" ? "ANALYZE TEXT" : "ANALYZE EMAIL";
+  const inputTitle = topic==="url" ? "URL INPUT" : topic==="file" ? "FILE INPUT" : topic==="text" ? "TEXT INPUT" : "EMAIL INPUT";
+  const inputMeta = topic==="url"
     ? "PASTE ONE URL"
-    : mode==="file"
+    : topic==="file"
       ? "MAX 100MB · .EXE .DLL .SCR .MSI"
-      : "MAX 100MB · .EML .MSG .TXT";
-
-  const switchMode = (nextMode) => {
-    setMode(nextMode);
-    setTab("upload");
-    setFile(null);
-    setSubj("");
-    setBody("");
-    setUrlValue("");
-    setDrag(false);
-    setFocused(false);
-    setPhase("idle");
-    setError("");
-    setAnalysis(EMPTY_ANALYSIS);
-  };
+      : topic==="text"
+        ? "SUBJECT + BODY"
+        : "MAX 100MB · .EML .MSG .TXT";
 
   const analyze=async()=>{
     if(!canScan) return;
@@ -1230,19 +1118,17 @@ const AnalyzerApp = ({mx, my}) => {
     setPhase("scanning");
     try{
       let response;
-      if(mode==="email"){
-        if(tab==="upload"&&file){
-          const form=new FormData();
-          form.append("file",file);
-          response=await fetch(`${API_BASE}/analyze-email`,{method:"POST",body:form});
-        }else{
-          response=await fetch(`${API_BASE}/analyze-text`,{
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({subject:subj,body}),
-          });
-        }
-      }else if(mode==="url"){
+      if(topic==="email"){
+        const form=new FormData();
+        form.append("file",file);
+        response=await fetch(`${API_BASE}/analyze-email`,{method:"POST",body:form});
+      }else if(topic==="text"){
+        response=await fetch(`${API_BASE}/analyze-text`,{
+          method:"POST",
+          headers:{"Content-Type":"application/json"},
+          body:JSON.stringify({subject:subj,body}),
+        });
+      }else if(topic==="url"){
         response=await fetch(`${API_BASE}/analyze-url`,{
           method:"POST",
           headers:{"Content-Type":"application/json"},
@@ -1268,12 +1154,12 @@ const AnalyzerApp = ({mx, my}) => {
       if(isNetworkError){
         setError(`Cannot reach backend at ${API_BASE}. Start backend on port 8000 or set VITE_API_BASE_URL.`);
       }else{
-        setError(msg||`Could not analyze this ${mode}.`);
+        setError(msg||`Could not analyze this ${topic}.`);
       }
       setPhase("idle");
     }
   };
-  const reset=()=>{setPhase("idle");setFile(null);setBody("");setSubj("");setUrlValue("");setError("");setAnalysis(EMPTY_ANALYSIS);};
+  const reset=()=>{setPhase("idle");setFile(null);setBody("");setSubj("");setUrlValue("");setError("");setAnalysis(EMPTY_ANALYSIS);setDrag(false);setFocused(false);};
   const result=analysis||EMPTY_ANALYSIS;
   const phishScore=toPercent(result.phishScore);
   const languageRisk=toPercent(result.languageRisk);
@@ -1312,41 +1198,16 @@ const AnalyzerApp = ({mx, my}) => {
     <div style={{position:"relative",zIndex:10,maxWidth:920,margin:"0 auto",padding:"80px 24px 120px"}}>
       <DataTicker/>
       {phase==="scanning"&&<ScanLine/>}
-      {/* Hero */}
       <section style={{textAlign:"center",padding:"40px 0 28px"}}>
         <motion.div initial={{opacity:0,y:32}} animate={{opacity:1,y:0}} transition={{delay:.2,duration:.6}}>
-          <div className="f-mono" style={{fontSize:12,color:"rgba(0,229,255,.45)",letterSpacing:5,marginTop:20,marginBottom:14}}>◆ AI-POWERED SECURITY ANALYSIS ◆</div>
+          <div className="f-mono" style={{fontSize:12,color:activeMeta.accent,letterSpacing:5,marginTop:20,marginBottom:14}}>◆ DEDICATED ANALYSIS PAGE ◆</div>
           <h1 className="f-orb" style={{fontSize:"clamp(34px,5vw,52px)",fontWeight:900,lineHeight:1.15,letterSpacing:1}}>
-            <span style={{color:"#D0E8F8"}}>Unified Threat</span><br/>
-            <span style={{background:"linear-gradient(90deg,#00E5FF 0%,#00FFA3 50%,#7C3AED 100%)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",filter:"drop-shadow(0 0 20px rgba(0,229,255,.4))"}}>Analyzer</span>
+            <span style={{color:"#D0E8F8"}}>{activeMeta.title}</span><br/>
+            <span style={{background:`linear-gradient(90deg,${activeMeta.accent} 0%, #00E5FF 100%)`,WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",filter:`drop-shadow(0 0 20px ${activeMeta.glow})`}}>{activeMeta.shortTitle} WORKFLOW</span>
           </h1>
-          <p className="f-syne" style={{color:"rgba(100,140,170,.66)",fontSize:16,margin:"18px auto 0",maxWidth:680,lineHeight:1.9}}>Frontend da duoc tach thanh <span style={{color:"#00E5FF"}}>3 khu rieng</span> cho tung model. Ban chon engine ben duoi roi thao tac tren dung input flow cua model do.</p>
+          <p className="f-syne" style={{color:"rgba(100,140,170,.66)",fontSize:16,margin:"18px auto 0",maxWidth:680,lineHeight:1.9}}>{activeMeta.description}</p>
           <div style={{display:"flex",gap:10,justifyContent:"center",flexWrap:"wrap",marginTop:24}}>
-            {["Three Dedicated Engines","Cleaner Workflow","Mode-Specific UI","Week-6 Integrated"].map(f=>(<div key={f} className="f-mono" style={{fontSize:11,color:"rgba(0,229,255,.52)",letterSpacing:1.1,padding:"6px 14px",borderRadius:99,background:"rgba(0,229,255,.04)",border:"1px solid rgba(0,229,255,.1)"}}>{f}</div>))}
-          </div>
-        </motion.div>
-      </section>
-
-      <section style={{marginBottom:22}}>
-        <motion.div initial={{opacity:0,y:18}} animate={{opacity:1,y:0}} transition={{delay:.35,duration:.5}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14,flexWrap:"wrap",gap:10}}>
-            <div>
-              <div className="f-orb" style={{fontSize:12,color:"rgba(0,229,255,.58)",letterSpacing:3.2}}>DETECTION ENGINES</div>
-              <div className="f-mono" style={{fontSize:12,color:"rgba(110,145,175,.56)",letterSpacing:1.25,marginTop:6}}>Moi model la mot muc rieng voi cach nhap lieu va bo hien thi rieng.</div>
-            </div>
-            <div className="f-mono" style={{fontSize:11,color:activeMeta.accent,letterSpacing:1.8,padding:"8px 13px",borderRadius:999,background:`${activeMeta.accent}10`,border:`1px solid ${activeMeta.accent}2F`}}>
-              ACTIVE ENGINE: {activeMeta.shortTitle}
-            </div>
-          </div>
-          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:14}}>
-            {ANALYZER_MODES.map(({id})=>(
-              <ModelModeCard
-                key={id}
-                meta={MODEL_META[id]}
-                active={mode===id}
-                onClick={()=>switchMode(id)}
-              />
-            ))}
+            {activeMeta.chips.map((chip)=>(<div key={chip} className="f-mono" style={{fontSize:11,color:activeMeta.accent,letterSpacing:1.1,padding:"6px 14px",borderRadius:99,background:`${activeMeta.accent}10`,border:`1px solid ${activeMeta.accent}22`}}>{chip}</div>))}
           </div>
         </motion.div>
       </section>
@@ -1373,28 +1234,23 @@ const AnalyzerApp = ({mx, my}) => {
               <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:18}}>
                 {activeMeta.chips.map((chip)=>(<span key={chip} className="f-mono" style={{fontSize:10,color:activeMeta.accent,letterSpacing:1.2,padding:"5px 11px",borderRadius:999,background:`${activeMeta.accent}10`,border:`1px solid ${activeMeta.accent}24`}}>{chip}</span>))}
               </div>
-              {mode==="email"&&(
-                <div style={{display:"flex",background:"rgba(0,0,0,.5)",borderRadius:12,padding:5,width:"fit-content",marginBottom:24,border:`1px solid ${activeMeta.accent}22`}}>
-                  {[["upload","📎 Upload .eml"],["paste","✏️ Paste Email"]].map(([id,lbl])=>(<button key={id} onClick={()=>setTab(id)} style={{padding:"11px 24px",borderRadius:8,border:"none",cursor:"pointer",fontFamily:"'JetBrains Mono',monospace",fontSize:12,letterSpacing:1.1,transition:"all .25s",background:tab===id?`${activeMeta.accent}18`:"transparent",color:tab===id?activeMeta.accent:"rgba(100,140,170,.4)",boxShadow:tab===id?`0 0 16px ${activeMeta.glow}, inset 0 1px 0 rgba(255,255,255,.04)`:"none"}}>{lbl}</button>))}
-                </div>
-              )}
               <AnimatePresence mode="wait">
-                {mode==="email"&&tab==="upload"?(
+                {topic==="email"?(
                   <motion.div key="up" initial={{opacity:0,x:-18}} animate={{opacity:1,x:0}} exit={{opacity:0,x:18}} transition={{duration:.2}} onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer.files[0];if(f)setFile(f);}} onClick={()=>document.getElementById("fi2").click()} style={{border:`1.5px dashed ${drag?"#00E5FF":file?"#00FFA3":"rgba(0,229,255,.16)"}`,borderRadius:12,padding:"50px 28px",textAlign:"center",cursor:"pointer",background:drag?"rgba(0,229,255,.04)":"rgba(0,0,0,.2)",transition:"all .3s"}}>
                     <input id="fi2" type="file" accept=".eml,.msg,.txt" style={{display:"none"}} onChange={e=>{const f=e.target.files[0];if(f)setFile(f);}}/>
                     <div style={{fontSize:44,marginBottom:14}}>{file?"✅":"📧"}</div>
                     {file?(<><div className="f-mono" style={{color:"#00FFA3",fontSize:16}}>{file.name}</div><div style={{color:"rgba(0,255,163,.5)",fontSize:13,marginTop:6}}>{formatFileSize(file.size)} · Ready for analysis</div></>):(<><div className="f-orb" style={{color:"rgba(100,140,170,.58)",fontSize:13,letterSpacing:3}}>DROP FILE HERE</div><div style={{color:"rgba(100,140,170,.32)",fontSize:13,marginTop:8}}>or click to browse — supports .eml, .msg, .txt</div></>)}
                   </motion.div>
-                ):mode==="email"?(
+                ):topic==="text"?(
                   <motion.div key="ps" initial={{opacity:0,x:18}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-18}} transition={{duration:.2}}>
                     <div style={{marginBottom:16}}><label className="f-mono" style={{display:"block",fontSize:11,color:"rgba(100,140,170,.58)",letterSpacing:2.2,marginBottom:8}}>SUBJECT LINE</label><input value={subj} onChange={e=>setSubj(e.target.value)} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)} placeholder="Re: Urgent — Verify Your Account Immediately" className="cyber-input" style={{padding:"13px 16px",fontSize:15}}/></div>
                     <div><label className="f-mono" style={{display:"block",fontSize:11,color:"rgba(100,140,170,.58)",letterSpacing:2.2,marginBottom:8}}>FULL EMAIL BODY</label><textarea value={body} onChange={e=>setBody(e.target.value)} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)} placeholder={"Paste complete email content here...\n\nInclude headers for best analysis results."} rows={9} className="cyber-input" style={{padding:"15px 16px",resize:"vertical",lineHeight:1.8,fontSize:15}}/></div>
                     <div className="f-mono" style={{fontSize:12,color:"rgba(255,214,10,.72)",marginTop:12,lineHeight:1.75}}>Paste mode has less header evidence than a real <span style={{color:"#FFD60A"}}>.eml</span> file, so SPF/DKIM checks may be unavailable.</div>
                   </motion.div>
-                ):mode==="url"?(
+                ):topic==="url"?(
                   <motion.div key="url" initial={{opacity:0,x:18}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-18}} transition={{duration:.2}}>
                     <div><label className="f-mono" style={{display:"block",fontSize:11,color:"rgba(100,140,170,.58)",letterSpacing:2.2,marginBottom:8}}>TARGET URL</label><input value={urlValue} onChange={e=>setUrlValue(e.target.value)} onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)} placeholder="https://example.com/login/verify-account" className="cyber-input" style={{padding:"13px 16px",fontSize:15}}/></div>
-                    <div className="f-mono" style={{fontSize:12,color:"rgba(100,140,170,.46)",marginTop:12,lineHeight:1.75}}>API sẽ dùng model trong thư mục <span style={{color:"rgba(0,229,255,.7)"}}>URL/models</span> để trả về vote của từng model.</div>
+                    <div className="f-mono" style={{fontSize:12,color:"rgba(100,140,170,.46)",marginTop:12,lineHeight:1.75}}>This API uses the models in <span style={{color:"rgba(0,229,255,.7)"}}>URL/models</span> and returns the vote from each model in the ensemble.</div>
                   </motion.div>
                 ):(
                   <motion.div key="file-upload" initial={{opacity:0,x:-18}} animate={{opacity:1,x:0}} exit={{opacity:0,x:18}} transition={{duration:.2}} onDragOver={e=>{e.preventDefault();setDrag(true);}} onDragLeave={()=>setDrag(false)} onDrop={e=>{e.preventDefault();setDrag(false);const f=e.dataTransfer.files[0];if(f)setFile(f);}} onClick={()=>document.getElementById("fi3").click()} style={{border:`1.5px dashed ${drag?"#00E5FF":file?"#FF4D6D":"rgba(0,229,255,.16)"}`,borderRadius:12,padding:"50px 28px",textAlign:"center",cursor:"pointer",background:drag?"rgba(0,229,255,.04)":"rgba(0,0,0,.2)",transition:"all .3s"}}>
@@ -1417,7 +1273,7 @@ const AnalyzerApp = ({mx, my}) => {
                       {canScan&&<div style={{position:"absolute",inset:0,background:"linear-gradient(90deg,transparent,rgba(0,229,255,.05),transparent)",animation:"data-scroll 3s linear infinite"}}/>}
                       <span className="f-orb" style={{fontSize:14,letterSpacing:4.2,color:canScan?"#00E5FF":"rgba(100,140,170,.2)",position:"relative",zIndex:1}}>⬡ {scanLabel}</span>
                     </motion.button>
-                    {!canScan&&<p className="f-mono" style={{color:"rgba(100,140,170,.3)",fontSize:11,letterSpacing:2.1,marginTop:16}}>{mode==="url"?"ENTER A URL TO BEGIN SCAN":mode==="file"?"UPLOAD A FILE TO BEGIN SCAN":"UPLOAD OR PASTE EMAIL TO BEGIN SCAN"}</p>}
+                    {!canScan&&<p className="f-mono" style={{color:"rgba(100,140,170,.3)",fontSize:11,letterSpacing:2.1,marginTop:16}}>{topic==="url"?"ENTER A URL TO BEGIN SCAN":topic==="file"?"UPLOAD A FILE TO BEGIN SCAN":topic==="text"?"PASTE SUBJECT OR BODY TO BEGIN SCAN":"UPLOAD AN EMAIL FILE TO BEGIN SCAN"}</p>}
                     {error&&<p className="f-mono" style={{color:"#FF7A8C",fontSize:12,letterSpacing:.8,marginTop:16}}>{error}</p>}
                   </motion.div>
                 )}
@@ -1662,8 +1518,6 @@ const AnalyzerApp = ({mx, my}) => {
         )}
       </AnimatePresence>
 
-      <DashboardPreview />
-
       <motion.footer initial={{opacity:0}} animate={{opacity:1}} transition={{delay:1.2}} style={{textAlign:"center",marginTop:72,paddingTop:30,borderTop:"1px solid rgba(0,229,255,.05)"}}>
         <div style={{display:"flex",justifyContent:"center",alignItems:"center",gap:20,flexWrap:"wrap"}}>{["247,832 THREATS TRACKED","99.98% UPTIME","<15ms LATENCY","AI MODEL v2.4.1"].map(s=>(<span key={s} className="f-mono" style={{fontSize:11,color:"rgba(100,140,170,.28)",letterSpacing:1.2}}>{s}</span>))}</div>
         <div className="f-mono" style={{fontSize:10,color:"rgba(100,140,170,.18)",marginTop:12,letterSpacing:3}}>SENTINEL AI · THREAT INTELLIGENCE PLATFORM · BUILD 2026.03</div>
@@ -1689,22 +1543,26 @@ export default function App() {
     return()=>{window.removeEventListener("scroll",onScroll);window.removeEventListener("mousemove",onMove);};
   },[]);
 
-  const goToApp = () => { setPage("app"); window.scrollTo({top:0,behavior:"smooth"}); };
+  const goToPage = (nextPage) => { setPage(nextPage); window.scrollTo({top:0,behavior:"smooth"}); };
   const goHome  = () => { setPage("landing"); window.scrollTo({top:0,behavior:"smooth"}); };
 
   return (
     <div style={{minHeight:"100vh",position:"relative"}}>
       <GlobalStyles/>
       <AuroraBlobs/>
-      <Nav page={page} setPage={p=>{if(p==="landing")goHome();else goToApp();}} scrollY={scrollY}/>
+      <Nav page={page} setPage={p=>{if(p==="landing")goHome();else goToPage(p);}} scrollY={scrollY}/>
       <AnimatePresence mode="wait">
         {page==="landing" ? (
           <motion.div key="landing" initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0,x:-40}} transition={{duration:.4}}>
-            <LandingPage mx={mx} my={my} goToApp={goToApp}/>
+            <LandingPage mx={mx} my={my} setPage={goToPage}/>
+          </motion.div>
+        ) : page==="dashboard" ? (
+          <motion.div key="dashboard" initial={{opacity:0,x:40}} animate={{opacity:1,x:0}} exit={{opacity:0,x:40}} transition={{duration:.4}}>
+            <DashboardPage />
           </motion.div>
         ) : (
-          <motion.div key="app" initial={{opacity:0,x:40}} animate={{opacity:1,x:0}} exit={{opacity:0,x:40}} transition={{duration:.4}}>
-            <AnalyzerApp mx={mx} my={my}/>
+          <motion.div key={page} initial={{opacity:0,x:40}} animate={{opacity:1,x:0}} exit={{opacity:0,x:40}} transition={{duration:.4}}>
+            <AnalyzerApp topic={page}/>
           </motion.div>
         )}
       </AnimatePresence>

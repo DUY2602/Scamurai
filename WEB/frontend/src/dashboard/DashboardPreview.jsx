@@ -2,8 +2,7 @@ import { motion } from "framer-motion";
 
 import BarLineChart from "./BarLineChart.jsx";
 import DonutChart from "./DonutChart.jsx";
-import StackedBarChart from "./StackedBarChart.jsx";
-import { mockBarLineData, mockDonutData, mockStackedBarData } from "./mockDetectionData.js";
+import { mockBarLineData, mockDonutData } from "./mockDetectionData.js";
 
 const cardStyle = {
   padding: 22,
@@ -98,23 +97,6 @@ export default function DashboardPreview() {
               </div>
             ))}
           </div>
-        </div>
-
-        <div style={{ ...cardStyle, gridColumn: "span 2", minWidth: 0 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", marginBottom: 16 }}>
-            <div>
-              <div className="f-orb" style={{ fontSize: 20, color: "#E8F7FF" }}>Stacked Bar</div>
-              <div className="f-mono" style={{ fontSize: 11, color: "rgba(200,220,238,.58)", marginTop: 6 }}>
-                Safe, suspicious, and malicious detections stacked by asset type
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
-              <span style={legendStyle}><LegendDot color="#00E5FF" /> Safe</span>
-              <span style={legendStyle}><LegendDot color="#FFD166" /> Suspicious</span>
-              <span style={legendStyle}><LegendDot color="#FF5D73" /> Malicious</span>
-            </div>
-          </div>
-          <StackedBarChart data={mockStackedBarData} />
         </div>
       </div>
     </motion.section>

@@ -43,7 +43,13 @@ export default function StackedBarChart({ data }) {
     root
       .append("g")
       .call(d3.axisLeft(y).ticks(5))
-      .call((g) => g.selectAll("text").attr("fill", "rgba(200,220,238,.72)").style("font-size", "11px"))
+      .call((g) =>
+        g
+          .selectAll("text")
+          .attr("fill", "rgba(244,250,255,.94)")
+          .style("font-size", "11px")
+          .style("font-weight", "600")
+      )
       .call((g) => g.selectAll("line,path").attr("stroke", "rgba(0,229,255,.14)"))
       .call((g) => g.select(".domain").remove())
       .call((g) =>
@@ -59,7 +65,13 @@ export default function StackedBarChart({ data }) {
       .append("g")
       .attr("transform", `translate(0,${innerHeight})`)
       .call(d3.axisBottom(x))
-      .call((g) => g.selectAll("text").attr("fill", "rgba(200,220,238,.72)").style("font-size", "11px"))
+      .call((g) =>
+        g
+          .selectAll("text")
+          .attr("fill", "rgba(244,250,255,.94)")
+          .style("font-size", "11px")
+          .style("font-weight", "600")
+      )
       .call((g) => g.selectAll("line,path").attr("stroke", "rgba(0,229,255,.14)"));
 
     root
@@ -87,8 +99,9 @@ export default function StackedBarChart({ data }) {
       .attr("x", (d) => (x(d.detectionType) || 0) + x.bandwidth() / 2)
       .attr("y", (d) => y(d.safe + d.suspicious + d.malicious) - 10)
       .attr("text-anchor", "middle")
-      .attr("fill", "#E8F7FF")
+      .attr("fill", "#F8FCFF")
       .style("font-size", "11px")
+      .style("font-weight", "700")
       .style("font-family", "JetBrains Mono, monospace")
       .text((d) => d.safe + d.suspicious + d.malicious);
   }, [data]);
