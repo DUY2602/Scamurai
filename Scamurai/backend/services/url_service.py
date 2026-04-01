@@ -2,9 +2,9 @@ import joblib
 import pandas as pd
 from pathlib import Path
 
+from backend.services.asset_paths import find_asset_dir
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-MODEL_DIR = ROOT_DIR / "URL" / "models"
+MODEL_DIR = find_asset_dir(Path(__file__), "URL", "models")
 
 lgbm = joblib.load(MODEL_DIR / "lgbm_model.pkl")
 xgb = joblib.load(MODEL_DIR / "xgb_model.pkl")

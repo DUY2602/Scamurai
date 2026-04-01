@@ -2,8 +2,7 @@ import json
 from pathlib import Path
 from threading import Lock
 
-
-ROOT_DIR = Path(__file__).resolve().parents[3]
+from backend.services.asset_paths import maybe_find_asset_path
 
 _stats_lock = Lock()
 _stats = {
@@ -75,9 +74,18 @@ def get_dashboard_stats() -> dict:
 
 
 def get_dashboard_metrics() -> dict:
-    url_report = _load_json(ROOT_DIR / "URL" / "models" / "training_report.json")
-    file_report = _load_json(ROOT_DIR / "FILE" / "models" / "training_report.json")
-    email_report = _load_json(ROOT_DIR / "Email" / "models" / "training_report.json")
+    url_report = _load_json(
+        maybe_find_asset_path(Path(__file__), "URL", "models", "training_report.json")
+        or Path("__missing__")
+    )
+    file_report = _load_json(
+        maybe_find_asset_path(Path(__file__), "FILE", "models", "training_report.json")
+        or Path("__missing__")
+    )
+    email_report = _load_json(
+        maybe_find_asset_path(Path(__file__), "Email", "models", "training_report.json")
+        or Path("__missing__")
+    )
 
     email_selected = email_report.get("selected_model", {})
     email_metrics = email_selected.get("metrics", {}) if isinstance(email_selected, dict) else {}

@@ -4,9 +4,9 @@ import pefile
 import tempfile
 from pathlib import Path
 
+from backend.services.asset_paths import find_asset_dir
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-MODEL_DIR = ROOT_DIR / "FILE" / "models"
+MODEL_DIR = find_asset_dir(Path(__file__), "FILE", "models")
 
 lgbm = joblib.load(MODEL_DIR / "lightgbm_malware_model.pkl")
 xgb = joblib.load(MODEL_DIR / "xgboost_malware_model.pkl")

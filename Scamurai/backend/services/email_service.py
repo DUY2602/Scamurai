@@ -3,9 +3,9 @@ from email import policy
 from email.parser import BytesParser
 from pathlib import Path
 
+from backend.services.asset_paths import find_asset_dir
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-MODEL_DIR = ROOT_DIR / "Email" / "models"
+MODEL_DIR = find_asset_dir(Path(__file__), "Email", "models")
 model = joblib.load(MODEL_DIR / "best_model.pkl")
 vectorizer = joblib.load(MODEL_DIR / "vectorizer.pkl")
 scaler = joblib.load(MODEL_DIR / "scaler.pkl")
