@@ -9,3 +9,6 @@ lightgbm
 xgboost
 pefile
 tqdm
+fastapi
+uvicorn
+python-multipart

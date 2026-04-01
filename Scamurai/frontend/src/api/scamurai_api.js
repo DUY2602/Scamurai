@@ -1,7 +1,8 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+  import.meta.env.VITE_API_BASE_URL ??
+  (import.meta.env.DEV ? "http://localhost:8000" : "/api");
 
 export const API = axios.create({
   baseURL: API_BASE_URL,
@@ -54,7 +55,7 @@ export function analyzeEmailText(subject, body) {
 }
 
 export function getDashboard() {
-  return API.get("/dashboard").then((response) => response.data);
+  return API.get("/dashboard/stats").then((response) => response.data);
 }
 
 export function getMetrics() {

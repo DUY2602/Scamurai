@@ -2,6 +2,7 @@ fastapi
 uvicorn
 joblib
 scikit-learn
+scipy
 lightgbm
 xgboost
 pefile

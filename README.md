@@ -156,3 +156,28 @@ User can customize the test email they want the model to predict by changing the
 
 ---
 # assignment3-hcmc1-6
+
+## Deploy On Vercel
+
+This repo now includes a Vercel setup that serves:
+
+- `Scamurai/frontend` as the static React app
+- `api/index.py` as the Python entrypoint for the FastAPI backend
+
+### Recommended project settings
+
+1. Import the repo into Vercel
+2. Keep the project root at the repository root
+3. Vercel will use:
+   - `vercel.json`
+   - root `requirements.txt`
+   - frontend build output from `Scamurai/frontend/dist`
+
+### Local behavior after this change
+
+- Frontend dev still uses `http://localhost:8000`
+- Production frontend defaults to `/api`
+
+### Important note
+
+The backend uses `lightgbm`, `xgboost`, `scikit-learn`, and bundled model files. If Vercel rejects the deployment because of Python package size or serverless runtime limits, the code/config is still correct, but you may need a less restrictive backend host such as Railway, Render, or Fly.io and point `VITE_API_BASE_URL` there.
