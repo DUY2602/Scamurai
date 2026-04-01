@@ -1,1 +1,10 @@
--r backend/requirements.txt
+fastapi
+uvicorn
+joblib
+scikit-learn
+lightgbm
+xgboost
+pefile
+python-multipart
+pandas
+numpy
