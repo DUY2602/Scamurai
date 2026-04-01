@@ -1,8 +1,0 @@
-scikit-learn>=1.5
-joblib>=1.4
-pandas>=2.2
-numpy>=2.0
-pefile>=2024.8.26
-lightgbm>=4.6
-xgboost>=3.1
-tqdm>=4.67
