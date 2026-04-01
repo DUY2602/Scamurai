@@ -8,13 +8,13 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import joblib
 import numpy as np
 import pandas as pd
 from lightgbm import LGBMClassifier
 from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, f1_score, roc_auc_score
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from xgboost import XGBClassifier
 
@@ -123,6 +123,56 @@ def evaluate_predictions(
     return metrics
 
 
+def evaluate_soft_voting_thresholds(
+    y_true: np.ndarray,
+    avg_prob: np.ndarray,
+    harmful_label: int,
+    benign_label: int,
+    thresholds: list[float],
+) -> tuple[dict[str, dict[str, Any]], float, np.ndarray]:
+    threshold_reports: dict[str, dict[str, Any]] = {}
+    selected_threshold: float | None = None
+    selected_score: tuple[float, float, float] | None = None
+
+    for threshold in thresholds:
+        y_pred = np.where(avg_prob >= threshold, harmful_label, benign_label)
+        report = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
+        harmful_metrics = report[str(harmful_label)]
+        threshold_reports[f"{threshold:.2f}"] = {
+            "threshold": float(threshold),
+            "confusion_matrix": confusion_matrix(y_true, y_pred).tolist(),
+            "classification_report": report,
+            "roc_auc": round(float(roc_auc_score(y_true, avg_prob)), 4),
+        }
+
+        precision = float(harmful_metrics["precision"])
+        recall = float(harmful_metrics["recall"])
+        f1_value = float(harmful_metrics["f1-score"])
+        if recall >= 0.80 and precision >= 0.65:
+            candidate_score = (f1_value, recall, precision)
+            if selected_score is None or candidate_score > selected_score:
+                selected_score = candidate_score
+                selected_threshold = float(threshold)
+
+    if selected_threshold is None:
+        fallback_threshold = thresholds[0]
+        best_fallback_score: tuple[float, float, float] | None = None
+        for threshold in thresholds:
+            report = threshold_reports[f"{threshold:.2f}"]["classification_report"]
+            harmful_metrics = report[str(harmful_label)]
+            precision = float(harmful_metrics["precision"])
+            recall = float(harmful_metrics["recall"])
+            f1_value = float(harmful_metrics["f1-score"])
+            candidate_score = (float(precision >= 0.65), recall, f1_value)
+            if best_fallback_score is None or candidate_score > best_fallback_score:
+                best_fallback_score = candidate_score
+                fallback_threshold = threshold
+        selected_threshold = float(fallback_threshold)
+
+    selected_pred = np.where(avg_prob >= selected_threshold, harmful_label, benign_label)
+    return threshold_reports, selected_threshold, selected_pred
+
+
 def refresh_processed_dataset(data_path: Path) -> pd.DataFrame:
     df = pd.read_csv(data_path)
     if "url" not in df.columns or "target" not in df.columns:
@@ -151,6 +201,65 @@ def build_hardcase_frame(scale: float) -> tuple[pd.DataFrame, np.ndarray]:
     return pd.DataFrame(rows), np.asarray(weights, dtype=float)
 
 
+def extract_domain(url: str) -> str:
+    normalized = str(url or "").strip().lower().replace("[", "").replace("]", "")
+    address = normalized if "://" in normalized else f"http://{normalized}"
+    try:
+        parsed = urlparse(address)
+    except Exception:
+        parsed = urlparse("http://invalid.local")
+
+    hostname = (parsed.hostname or "").strip(".")
+    if not hostname:
+        return "__missing__"
+
+    if hostname.replace(".", "").isdigit():
+        return hostname
+
+    parts = [part for part in hostname.split(".") if part]
+    if len(parts) >= 2:
+        return ".".join(parts[-2:])
+    return hostname
+
+
+def split_by_domain(df: pd.DataFrame, test_size: float, random_state: int) -> tuple[pd.DataFrame, pd.DataFrame, dict[str, Any]]:
+    if "url" not in df.columns:
+        raise ValueError("Domain-based split requires a 'url' column in the processed dataset.")
+
+    split_df = df.copy()
+    split_df["domain"] = split_df["url"].astype(str).map(extract_domain)
+
+    unique_domains = split_df["domain"].dropna().astype(str).unique()
+    shuffled_domains = np.array(unique_domains, dtype=object)
+    rng = np.random.default_rng(random_state)
+    rng.shuffle(shuffled_domains)
+
+    split_index = int(len(shuffled_domains) * (1.0 - test_size))
+    split_index = min(max(split_index, 1), max(len(shuffled_domains) - 1, 1))
+
+    train_domains = set(shuffled_domains[:split_index].tolist())
+    test_domains = set(shuffled_domains[split_index:].tolist())
+
+    train_df = split_df[split_df["domain"].isin(train_domains)].drop(columns=["domain"]).reset_index(drop=True)
+    test_df = split_df[split_df["domain"].isin(test_domains)].drop(columns=["domain"]).reset_index(drop=True)
+
+    overlap = train_domains & test_domains
+    split_summary = {
+        "train_domains": int(len(train_domains)),
+        "test_domains": int(len(test_domains)),
+        "domain_overlap": int(len(overlap)),
+        "train_rows": int(len(train_df)),
+        "test_rows": int(len(test_df)),
+        "train_label_distribution": {str(label): int(count) for label, count in train_df["target"].value_counts().to_dict().items()},
+        "test_label_distribution": {str(label): int(count) for label, count in test_df["target"].value_counts().to_dict().items()},
+    }
+
+    if len(overlap) != 0:
+        raise RuntimeError(f"Domain split failed; overlap detected: {sorted(list(overlap))[:5]}")
+
+    return train_df, test_df, split_summary
+
+
 def print_model_metrics(
     model_name: str,
     y_true: np.ndarray,
@@ -162,6 +271,31 @@ def print_model_metrics(
     print(classification_report(y_true, y_pred, target_names=target_names, zero_division=0))
     if y_prob is not None:
         print(f"ROC AUC: {roc_auc_score(y_true, y_prob):.4f}")
+
+
+def print_soft_voting_threshold_metrics(
+    threshold_reports: dict[str, dict[str, Any]],
+    target_names: list[str],
+    harmful_label: int,
+) -> None:
+    print("\n=== Soft Voting Threshold Sweep ===")
+    for threshold_key, report_bundle in threshold_reports.items():
+        report = report_bundle["classification_report"]
+        harmful_metrics = report[str(harmful_label)]
+        print(f"\nThreshold {threshold_key}")
+        print("Confusion matrix:")
+        print(np.asarray(report_bundle["confusion_matrix"]))
+        print(
+            f"Harm precision={harmful_metrics['precision']:.4f} "
+            f"recall={harmful_metrics['recall']:.4f} "
+            f"f1={harmful_metrics['f1-score']:.4f}"
+        )
+        print("Classification report:")
+        print(
+            pd.DataFrame(report).transpose().loc[
+                [str(0), str(1), "accuracy", "macro avg", "weighted avg"]
+            ].rename(index={str(0): target_names[0], str(1): target_names[1]})
+        )
 
 
 def main() -> None:
@@ -186,20 +320,21 @@ def main() -> None:
     if args.sample_frac < 1.0:
         df = df.sample(frac=args.sample_frac, random_state=args.random_state).reset_index(drop=True)
 
-    X = df[FEATURE_COLUMNS]
     label_encoder = LabelEncoder()
     y = label_encoder.fit_transform(df["target"].astype(str))
     target_names = label_encoder.classes_.tolist()
     harmful_label = int(label_encoder.transform(["harm"])[0])
     benign_label = int(label_encoder.transform(["benign"])[0])
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X,
-        y,
+    train_df, test_df, split_summary = split_by_domain(
+        df,
         test_size=args.test_size,
         random_state=args.random_state,
-        stratify=y,
     )
+    X_train = train_df[FEATURE_COLUMNS]
+    X_test = test_df[FEATURE_COLUMNS]
+    y_train = label_encoder.transform(train_df["target"].astype(str))
+    y_test = label_encoder.transform(test_df["target"].astype(str))
 
     hardcase_frame, hardcase_weights = build_hardcase_frame(args.hardcase_scale)
     hardcase_targets = label_encoder.transform(hardcase_frame["target"].astype(str))
@@ -260,12 +395,15 @@ def main() -> None:
     xgb_test_pred = xgb.predict(X_test_xgb_frame)
     xgb_test_prob = xgb.predict_proba(X_test_xgb_frame)[:, harmful_label]
 
-    ensemble_test_pred = np.where(
-        (lgbm_test_pred == harmful_label) & (xgb_test_pred == harmful_label),
+    ensemble_test_prob = (lgbm_test_prob + xgb_test_prob) / 2.0
+    threshold_candidates = [0.40, 0.45, 0.50]
+    soft_voting_thresholds, selected_threshold, ensemble_test_pred = evaluate_soft_voting_thresholds(
+        y_test,
+        ensemble_test_prob,
         harmful_label,
         benign_label,
+        threshold_candidates,
     )
-    ensemble_test_prob = np.minimum(lgbm_test_prob, xgb_test_prob)
 
     report: dict[str, Any] = {
         "task": "url_retraining",
@@ -282,10 +420,17 @@ def main() -> None:
                 for class_name, count in zip(*np.unique(df["target"].astype(str), return_counts=True), strict=False)
             },
             "hardcase_rows": int(len(hardcase_frame)),
+            "domain_split": split_summary,
         },
         "lightgbm": evaluate_predictions(y_test, lgbm_test_pred, lgbm_test_prob),
         "xgboost": evaluate_predictions(y_test, xgb_test_pred, xgb_test_prob),
         "ensemble": evaluate_predictions(y_test, ensemble_test_pred, ensemble_test_prob),
+        "ensemble_soft_voting": {
+            "probability_source": "avg_prob = (lgbm_prob + xgb_prob) / 2",
+            "threshold_candidates": threshold_candidates,
+            "selected_threshold": selected_threshold,
+            "threshold_reports": soft_voting_thresholds,
+        },
         "metadata": {
             "feature_columns": FEATURE_COLUMNS,
             "scale_pos_weight": round(float(scale_pos_weight), 6),
@@ -310,7 +455,11 @@ def main() -> None:
 
     print_model_metrics("LightGBM", y_test, lgbm_test_pred, lgbm_test_prob, target_names)
     print_model_metrics("XGBoost", y_test, xgb_test_pred, xgb_test_prob, target_names)
-    print_model_metrics("Ensemble", y_test, ensemble_test_pred, ensemble_test_prob, target_names)
+    print_model_metrics(f"Ensemble (Soft Voting @ {selected_threshold:.2f})", y_test, ensemble_test_pred, ensemble_test_prob, target_names)
+    print_soft_voting_threshold_metrics(soft_voting_thresholds, target_names, harmful_label)
+    print(f"\nSelected soft-voting threshold: {selected_threshold:.2f}")
+    print("\n=== Domain Split Summary ===")
+    print(json.dumps(split_summary, indent=2))
 
     print("\n=== training_report.json ===")
     print(json.dumps(report, indent=2))

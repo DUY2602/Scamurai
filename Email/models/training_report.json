@@ -348,5 +348,105 @@
   },
   "artifact_path": "Email\\models\\email_model.joblib",
   "report_path": "Email\\models\\training_report.json",
-  "backup_dir": null
+  "backup_dir": null,
+  "runtime_model": {
+    "best_model_path": "C:\\COS30018\\another one\\Email\\models\\best_model.pkl",
+    "vectorizer_path": "C:\\COS30018\\another one\\Email\\models\\vectorizer.pkl",
+    "scaler_path": "C:\\COS30018\\another one\\Email\\models\\scaler.pkl",
+    "legacy_models_archived": {
+      "lgb_model.pkl": "C:\\COS30018\\another one\\Email\\models\\legacy\\lgb_model.pkl",
+      "xgb_model.pkl": "C:\\COS30018\\another one\\Email\\models\\legacy\\xgb_model.pkl"
+    }
+  },
+  "clean_external_test": {
+    "test_dir": "C:\\COS30018\\another one\\Email\\data\\test",
+    "overlap_cleanup": {
+      "moved_total": 0,
+      "unique_overlap_texts_moved_this_run": 0,
+      "moved_by_label": {
+        "ham": 0,
+        "spam": 0
+      },
+      "archive_dir": "C:\\COS30018\\another one\\Email\\data\\test_overlap_removed",
+      "archived_total": 4090,
+      "archived_by_label": {
+        "ham": 3512,
+        "spam": 578
+      },
+      "archived_unique_overlap_texts": 2037,
+      "records_sample": []
+    },
+    "metrics": {
+      "model_type": "LogisticRegression",
+      "selected_model": "logistic_regression",
+      "rows": 6661,
+      "label_distribution": {
+        "ham": 3442,
+        "spam": 3219
+      },
+      "accuracy": 0.9453535505179402,
+      "precision_spam": 0.9766277128547579,
+      "recall_spam": 0.9086672879776329,
+      "f1_spam": 0.9414225941422594,
+      "roc_auc": 0.9876714358871885,
+      "confusion_matrix": [
+        [
+          3372,
+          70
+        ],
+        [
+          294,
+          2925
+        ]
+      ],
+      "classification_report": {
+        "ham": {
+          "precision": 0.9198036006546645,
+          "recall": 0.979662986635677,
+          "f1-score": 0.9487900956668542,
+          "support": 3442.0
+        },
+        "spam": {
+          "precision": 0.9766277128547579,
+          "recall": 0.9086672879776329,
+          "f1-score": 0.9414225941422594,
+          "support": 3219.0
+        },
+        "accuracy": 0.9453535505179402,
+        "macro avg": {
+          "precision": 0.9482156567547112,
+          "recall": 0.9441651373066549,
+          "f1-score": 0.9451063449045568,
+          "support": 6661.0
+        },
+        "weighted avg": {
+          "precision": 0.9472644649651436,
+          "recall": 0.9453535505179402,
+          "f1-score": 0.9452296711949025,
+          "support": 6661.0
+        }
+      },
+      "classification_report_text": "              precision    recall  f1-score   support\n\n         ham     0.9198    0.9797    0.9488      3442\n        spam     0.9766    0.9087    0.9414      3219\n\n    accuracy                         0.9454      6661\n   macro avg     0.9482    0.9442    0.9451      6661\nweighted avg     0.9473    0.9454    0.9452      6661\n",
+      "missed_spam_examples": [
+        {
+          "path": "C:\\COS30018\\another one\\Email\\data\\test\\spam\\20021010_spam\\spam\\0078.8ff64b5c77f9c9618bd7b119ae14c8b2",
+          "subject": "WebDesignHQ Newsletter",
+          "body_preview": "We thought you may be interested in our new software release: WebDesignHQ Newsletter 23rd of August 2002 07:10:09 PM The",
+          "spam_probability": 0.2948970653976903
+        },
+        {
+          "path": "C:\\COS30018\\another one\\Email\\data\\test\\spam\\20021010_spam\\spam\\0228.23fc5aadfceb81d121d77dfe37f6929a",
+          "subject": "Customized Warez CDs",
+          "body_preview": "Introduction We sell Backup CDs, also known as Warez CDs. Backup CDs are copies of Software. For example if you",
+          "spam_probability": 0.19732385549478118
+        },
+        {
+          "path": "C:\\COS30018\\another one\\Email\\data\\test\\spam\\20021010_spam\\spam\\0249.c429ab5c1413c4386bf64b228a68e768",
+          "subject": "NEW TECHNOLOGY - DIGITAL VIDEO RECORDER (Smart IP Technology)",
+          "body_preview": "SecurePro DVR DIGITAL VIDEO RECORDER JK-400 COST - EFFECTIVE Digital Video Monitoring & Recording Solutions for Office, Shop, Home &",
+          "spam_probability": 0.3766392668984407
+        }
+      ]
+    }
+  }
 }

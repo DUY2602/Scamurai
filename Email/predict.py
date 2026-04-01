@@ -23,6 +23,7 @@ except ImportError:  # pragma: no cover - direct script execution fallback
 
 ROOT_DIR = Path(__file__).resolve().parent
 MODELS_DIR = ROOT_DIR / "models"
+LEGACY_MODELS_DIR = MODELS_DIR / "legacy"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.pkl"
 BEST_MODEL_META_PATH = MODELS_DIR / "best_model_metadata.json"
 VECTORIZER_PATH = MODELS_DIR / "vectorizer.pkl"
@@ -54,7 +55,7 @@ def _load_artifacts() -> dict[str, Any]:
     if not BEST_MODEL_PATH.is_file():
         raise FileNotFoundError(
             "Email runtime requires models/best_model.pkl. "
-            "Legacy lgb_model.pkl/xgb_model.pkl are archived artifacts and are not used in production."
+            f"Legacy artifacts, when present, belong under {LEGACY_MODELS_DIR} and are not used in production."
         )
 
     model = joblib.load(BEST_MODEL_PATH)
