@@ -1,32 +1,12 @@
 import axios from "axios";
 
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
 export const API = axios.create({
-  baseURL: "http://localhost:8001",
+  baseURL: API_BASE_URL,
   timeout: 15000,
 });
-
-async function requestWithFallback(requests) {
-  for (let index = 0; index < requests.length; index += 1) {
-    try {
-      const response = await API.request(requests[index]);
-      return response.data;
-    } catch (error) {
-      const canRetry =
-        axios.isAxiosError(error) &&
-        error.response &&
-        [404, 405].includes(error.response.status) &&
-        index < requests.length - 1;
-
-      if (canRetry) {
-        continue;
-      }
-
-      throw error;
-    }
-  }
-
-  return null;
-}
 
 export function getApiErrorMessage(
   error,
@@ -48,7 +28,7 @@ export function getApiErrorMessage(
     }
 
     if (!error.response) {
-      return "Cannot connect to the backend at http://localhost:8001. Make sure the server is running.";
+      return `Cannot connect to the backend at ${API_BASE_URL}. Make sure the server is running.`;
     }
   }
 
@@ -56,43 +36,27 @@ export function getApiErrorMessage(
 }
 
 export function analyzeUrl(url) {
-  return requestWithFallback([
-    { method: "post", url: "/analyze-url/", data: { url } },
-    { method: "post", url: "/url/", data: { url } },
-  ]);
+  return API.post("/url", { url }).then((response) => response.data);
 }
 
 export function analyzeFile(formData) {
-  return requestWithFallback([
-    { method: "post", url: "/analyze-file/", data: formData },
-    { method: "post", url: "/file/", data: formData },
-  ]);
+  return API.post("/file", formData).then((response) => response.data);
 }
 
 export function analyzeEmailFile(formData) {
-  return requestWithFallback([
-    { method: "post", url: "/analyze-email/file", data: formData },
-    { method: "post", url: "/email/file", data: formData },
-  ]);
+  return API.post("/email/file", formData).then((response) => response.data);
 }
 
 export function analyzeEmailText(subject, body) {
-  return requestWithFallback([
-    { method: "post", url: "/analyze-email/text", data: { subject, body } },
-    { method: "post", url: "/email/text", data: { subject, body } },
-  ]);
+  return API.post("/email/text", { subject, body }).then(
+    (response) => response.data
+  );
 }
 
 export function getDashboard() {
-  return requestWithFallback([
-    { method: "get", url: "/dashboard/stats" },
-    { method: "get", url: "/dashboard" },
-  ]);
+  return API.get("/dashboard").then((response) => response.data);
 }
 
 export function getMetrics() {
-  return requestWithFallback([
-    { method: "get", url: "/dashboard/model-metrics" },
-    { method: "get", url: "/dashboard/metrics" },
-  ]);
+  return API.get("/dashboard/model-metrics").then((response) => response.data);
 }

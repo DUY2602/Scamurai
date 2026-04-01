@@ -6,6 +6,9 @@ import EmailPage from "./pages/EmailPage";
 import FilePage from "./pages/FilePage";
 import Dashboard from "./pages/Dashboard";
 
+const apiBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000";
+
 export default function App() {
   return (
     <div className="app-shell">
@@ -23,7 +26,7 @@ export default function App() {
       <footer className="site-footer">
         <div className="page-shell site-footer__inner">
           <p>Scamurai is a student-friendly cybersecurity dashboard for fast scam detection demos.</p>
-          <p>Frontend: React + Vite. Backend: http://localhost:8001</p>
+          <p>Frontend: React + Vite. Backend: {apiBaseUrl}</p>
         </div>
       </footer>
     </div>

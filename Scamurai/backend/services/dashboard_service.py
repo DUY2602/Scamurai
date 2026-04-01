@@ -99,9 +99,9 @@ def record_scan(scan_type: str, result: dict) -> None:
     if scan_type not in _stats["by_type"]:
         return
 
-    is_malicious = bool(result.get("is_malicious") or result.get("is_spam"))
-    verdict_text = str(result.get("verdict", "")).lower()
-    is_suspicious = "suspicious" in verdict_text or "warning" in verdict_text
+    status = str(result.get("status", "")).lower()
+    is_malicious = status == "threat" or bool(result.get("is_malicious") or result.get("is_spam"))
+    is_suspicious = status == "suspicious"
 
     summary_key = "safe_count"
     if is_malicious:

@@ -9,7 +9,7 @@ router = APIRouter()
 class UrlRequest(BaseModel):
     url: str
     
-@router.post("/")
+@router.post("")
 def analyze_url(payload: UrlRequest):
     if not payload.url:
         raise HTTPException(400, "URL không được để trống")

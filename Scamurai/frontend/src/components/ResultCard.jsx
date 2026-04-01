@@ -46,6 +46,29 @@ function formatMetricValue(value, key = "") {
   return String(value);
 }
 
+function polarToCartesian(cx, cy, radius, angleInDegrees) {
+  const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
+  return {
+    x: cx + radius * Math.cos(angleInRadians),
+    y: cy - radius * Math.sin(angleInRadians),
+  };
+}
+
+function describeArc(cx, cy, radius, startAngle, endAngle) {
+  const start = polarToCartesian(cx, cy, radius, startAngle);
+  const end = polarToCartesian(cx, cy, radius, endAngle);
+  const largeArcFlag = Math.abs(endAngle - startAngle) <= 180 ? "0" : "1";
+  const sweepFlag = startAngle > endAngle ? "1" : "0";
+
+  return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} ${sweepFlag} ${end.x} ${end.y}`;
+}
+
+function describeSemiDisk(cx, cy, radius) {
+  const left = polarToCartesian(cx, cy, radius, 180);
+  const right = polarToCartesian(cx, cy, radius, 0);
+  return `M ${left.x} ${left.y} A ${radius} ${radius} 0 0 1 ${right.x} ${right.y} L ${cx} ${cy} Z`;
+}
+
 function getTone(status, data) {
   const statusPool = [
     status,
@@ -88,8 +111,8 @@ function getTone(status, data) {
 function getStatusText(status, data, tone) {
   const value =
     status ||
-    data?.verdict ||
     data?.status ||
+    data?.verdict ||
     data?.classification ||
     data?.label;
 
@@ -98,18 +121,73 @@ function getStatusText(status, data, tone) {
   }
 
   if (tone === "danger") {
-    return "Danger detected";
+    return "Threat Detected";
   }
 
   if (tone === "warning") {
-    return "Needs review";
+    return "Needs Review";
   }
 
   if (tone === "safe") {
-    return "Looks safe";
+    return "Low Risk";
   }
 
-  return "Analysis complete";
+  return "Analysis Ready";
+}
+
+function getGaugeMeta(tone) {
+  if (tone === "danger") {
+    return {
+      caption: "Escalated risk profile",
+    };
+  }
+
+  if (tone === "warning") {
+    return {
+      caption: "Borderline risk profile",
+    };
+  }
+
+  if (tone === "safe") {
+    return {
+      caption: "Stable low-risk profile",
+    };
+  }
+
+  return {
+    caption: "Current scan profile",
+  };
+}
+
+const PRIORITY_SCALAR_KEYS = [
+  "confidence",
+  "predicted_class",
+  "model_agreement",
+  "signal_strength",
+];
+
+function getToneMeta(tone) {
+  if (tone === "danger") {
+    return {
+      descriptor: "High-priority threat signal",
+    };
+  }
+
+  if (tone === "warning") {
+    return {
+      descriptor: "Suspicious activity needs review",
+    };
+  }
+
+  if (tone === "safe") {
+    return {
+      descriptor: "Low-risk result from the latest scan",
+    };
+  }
+
+  return {
+    descriptor: "Latest analysis result from Scamurai",
+  };
 }
 
 function shouldHideEntry(key, value) {
@@ -231,9 +309,29 @@ export default function ResultCard({ title, status, score, data }) {
   }
 
   const tone = getTone(status, data);
+  const toneMeta = getToneMeta(tone);
+  const gaugeMeta = getGaugeMeta(tone);
   const statusText = getStatusText(status, data, tone);
+  const scoreValue = score ?? data?.risk_score;
+  const numericScore = Number.isFinite(Number(scoreValue)) ? Math.max(0, Math.min(100, Number(scoreValue))) : null;
+  const needleAngle = numericScore === null ? 180 : 180 - (numericScore * 180) / 100;
+  const needlePoint = polarToCartesian(160, 160, 102, needleAngle);
+  const gaugeSegments = [
+    { color: "#2fb24a", start: 180, end: 144 },
+    { color: "#7fe135", start: 144, end: 108 },
+    { color: "#ffef14", start: 108, end: 72 },
+    { color: "#ffae22", start: 72, end: 36 },
+    { color: "#ff5a21", start: 36, end: 0 },
+  ];
 
   const duplicateKeys = new Set(["status", "classification", "label"]);
+  const hiddenKeys = new Set([
+    "detection_type",
+    "source_value",
+    "url",
+    "filename",
+    "subject_preview",
+  ]);
 
   if (status || data?.verdict) {
     duplicateKeys.add("verdict");
@@ -241,7 +339,6 @@ export default function ResultCard({ title, status, score, data }) {
 
   if (score !== undefined && score !== null) {
     duplicateKeys.add("risk_score");
-    duplicateKeys.add("spam_probability");
     duplicateKeys.add("score");
   }
 
@@ -249,7 +346,7 @@ export default function ResultCard({ title, status, score, data }) {
   const nestedEntries = [];
 
   Object.entries(data).forEach(([key, value]) => {
-    if (duplicateKeys.has(key) || shouldHideEntry(key, value)) {
+    if (duplicateKeys.has(key) || hiddenKeys.has(key) || shouldHideEntry(key, value)) {
       return;
     }
 
@@ -261,28 +358,71 @@ export default function ResultCard({ title, status, score, data }) {
     scalarEntries.push([key, value]);
   });
 
+  const priorityEntries = PRIORITY_SCALAR_KEYS.flatMap((key) => {
+    const matchedEntry = scalarEntries.find(([entryKey]) => entryKey === key);
+    return matchedEntry ? [matchedEntry] : [];
+  });
+
   return (
     <section className={`result-card result-card--${tone}`}>
       <div className="result-card__header">
-        <div>
+        <div className="result-card__hero">
           <p className="eyebrow">Result</p>
-          <h3>{title || "Scan Result"}</h3>
-          <p>Readable output for the latest Scamurai analysis.</p>
+          <div className="result-card__headline">
+            <h2>{statusText}</h2>
+          </div>
+          <h3>{title || "Prediction Details"}</h3>
+          <p>{toneMeta.descriptor}</p>
         </div>
-
-        <div className="result-card__summary">
-          <span className={`status-badge status-badge--${tone}`}>{statusText}</span>
-          {score !== undefined && score !== null ? (
-            <span className="score-badge">
-              Score {formatMetricValue(score, "risk_score")}
-            </span>
-          ) : null}
-        </div>
+        {scoreValue !== undefined && scoreValue !== null ? (
+          <div className="result-card__summary">
+            <div className="result-card__gauge-wrap">
+              <div className="result-gauge" aria-hidden="true">
+                <svg
+                  className="result-gauge__svg"
+                  viewBox="0 0 320 190"
+                  xmlns="http://www.w3.org/2000/svg"
+                >
+                  {gaugeSegments.map((segment) => (
+                    <path
+                      key={`${segment.start}-${segment.end}`}
+                      d={describeArc(160, 160, 120, segment.start, segment.end)}
+                      fill="none"
+                      stroke={segment.color}
+                      strokeLinecap="butt"
+                      strokeWidth="42"
+                    />
+                  ))}
+                  <path
+                    d={describeSemiDisk(160, 160, 76)}
+                    fill="rgba(255,255,255,0.96)"
+                  />
+                  <line
+                    stroke="#2b3440"
+                    strokeLinecap="round"
+                    strokeWidth="4"
+                    x1="160"
+                    x2={needlePoint.x}
+                    y1="160"
+                    y2={needlePoint.y}
+                  />
+                  <circle cx="160" cy="160" fill="#2b3440" r="13" />
+                  <circle cx="160" cy="160" fill="none" r="21" stroke="rgba(255,255,255,0.78)" strokeWidth="8" />
+                </svg>
+              </div>
+              <div className="result-card__score-readout">
+                <span>Risk Score</span>
+                <strong>{formatMetricValue(scoreValue, "risk_score")}</strong>
+              </div>
+              <p className="result-card__gauge-copy">{gaugeMeta.caption}</p>
+            </div>
+          </div>
+        ) : null}
       </div>
 
-      {scalarEntries.length ? (
+      {priorityEntries.length ? (
         <div className="kv-grid">
-          {scalarEntries.map(([key, value]) => (
+          {priorityEntries.map(([key, value]) => (
             <div className="kv-item" key={key}>
               <span className="kv-item__label">{formatLabel(key)}</span>
               <p className="kv-item__value">{formatMetricValue(value, key)}</p>

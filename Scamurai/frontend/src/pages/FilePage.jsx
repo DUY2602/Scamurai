@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { analyzeFile, getApiErrorMessage } from "../api/scamurai_api";
 import PageHeader from "../components/PageHeader";
 import ResultCard from "../components/ResultCard";
@@ -8,6 +8,18 @@ export default function FilePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const resultRef = useRef(null);
+
+  useEffect(() => {
+    if (!result || !resultRef.current) {
+      return;
+    }
+
+    resultRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [result]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -90,6 +102,7 @@ export default function FilePage() {
                 Reset
               </button>
             </div>
+
           </form>
         </section>
 
@@ -113,12 +126,14 @@ export default function FilePage() {
       </div>
 
       {result ? (
-        <ResultCard
-          data={result}
-          score={result.risk_score ?? result.score}
-          status={result.verdict}
-          title="File Scan Result"
-        />
+        <div className="result-section" ref={resultRef}>
+          <ResultCard
+            data={result}
+            score={result.risk_score ?? result.score}
+            status={result.status ?? result.verdict}
+            title="File Scan Result"
+          />
+        </div>
       ) : (
         <div className="empty-card">
           <h3>No file result yet</h3>

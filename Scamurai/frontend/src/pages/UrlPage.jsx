@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { analyzeUrl, getApiErrorMessage } from "../api/scamurai_api";
 import PageHeader from "../components/PageHeader";
 import ResultCard from "../components/ResultCard";
@@ -8,6 +8,18 @@ export default function UrlPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const resultRef = useRef(null);
+
+  useEffect(() => {
+    if (!result || !resultRef.current) {
+      return;
+    }
+
+    resultRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [result]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -82,6 +94,7 @@ export default function UrlPage() {
                 Clear
               </button>
             </div>
+
           </form>
         </section>
 
@@ -106,12 +119,14 @@ export default function UrlPage() {
       </div>
 
       {result ? (
-        <ResultCard
-          data={result}
-          score={result.risk_score ?? result.score ?? result.avg_prob}
-          status={result.verdict}
-          title="URL Scan Result"
-        />
+        <div className="result-section" ref={resultRef}>
+          <ResultCard
+            data={result}
+            score={result.risk_score ?? result.score ?? result.avg_prob}
+            status={result.status ?? result.verdict}
+            title="URL Scan Result"
+          />
+        </div>
       ) : (
         <div className="empty-card">
           <h3>No URL result yet</h3>

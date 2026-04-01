@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   analyzeEmailFile,
   analyzeEmailText,
@@ -15,6 +15,18 @@ export default function EmailPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
+  const resultRef = useRef(null);
+
+  useEffect(() => {
+    if (!result || !resultRef.current) {
+      return;
+    }
+
+    resultRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [result]);
 
   async function handleTextSubmit(event) {
     event.preventDefault();
@@ -154,6 +166,7 @@ export default function EmailPage() {
                   Clear
                 </button>
               </div>
+
             </form>
           ) : (
             <form className="form-grid" onSubmit={handleFileSubmit}>
@@ -195,6 +208,7 @@ export default function EmailPage() {
                   Clear
                 </button>
               </div>
+
             </form>
           )}
         </section>
@@ -219,12 +233,14 @@ export default function EmailPage() {
       </div>
 
       {result ? (
-        <ResultCard
-          data={result}
-          score={result.spam_probability ?? result.risk_score ?? result.score}
-          status={result.verdict}
-          title="Email Scan Result"
-        />
+        <div className="result-section" ref={resultRef}>
+          <ResultCard
+            data={result}
+            score={result.risk_score ?? result.spam_probability ?? result.score}
+            status={result.status ?? result.verdict}
+            title="Email Scan Result"
+          />
+        </div>
       ) : (
         <div className="empty-card">
           <h3>No email result yet</h3>

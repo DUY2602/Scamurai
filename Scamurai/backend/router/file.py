@@ -4,7 +4,7 @@ from backend.services.file_service import predict_file
 
 router = APIRouter()
 
-@router.post("/")
+@router.post("")
 async def analyze_file(file: UploadFile = File(...)):
     if not file.filename:
         raise HTTPException(400, "File không có tên")
