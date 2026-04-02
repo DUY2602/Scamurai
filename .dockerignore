@@ -1,0 +1,15 @@
+.git
+.gitignore
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.nixpacks
+api
+Scamurai/frontend/node_modules
+Scamurai/frontend/dist
+Email/training
+FILE/training
+URL/training
+evaluation_full_report.json

@@ -192,9 +192,8 @@ Recommended split:
 ### Backend service
 
 - Root directory: repository root
-- Builder: Nixpacks
-- Railway will read [nixpacks.toml](/d:/Assignment%203/nixpacks.toml)
-- Start command runs `uvicorn backend.main:app --app-dir Scamurai`
+- Builder: Dockerfile
+- Railway will build from [Dockerfile](/d:/Assignment%203/Dockerfile)
 
 Environment variables:
 
