@@ -202,8 +202,8 @@ Environment variables:
 ### Frontend service
 
 - Root directory: `Scamurai/frontend`
-- Builder: Nixpacks
-- Railway will read [Scamurai/frontend/nixpacks.toml](/d:/Assignment%203/Scamurai/frontend/nixpacks.toml)
+- Builder: Dockerfile
+- Railway will build from [Scamurai/frontend/Dockerfile](/d:/Assignment%203/Scamurai/frontend/Dockerfile)
 
 Environment variables:
 
