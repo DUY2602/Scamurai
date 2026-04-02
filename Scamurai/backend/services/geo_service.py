@@ -1,6 +1,9 @@
 import ipaddress
 
-import requests
+try:
+    import requests
+except Exception:  # pragma: no cover - optional local dependency fallback
+    requests = None
 
 
 def get_client_ip(request) -> str | None:
@@ -34,6 +37,9 @@ def _is_public_ip(ip: str | None) -> bool:
 
 
 def lookup_ip_location(ip: str | None) -> dict:
+    if requests is None:
+        return {}
+
     if not _is_public_ip(ip):
         return {}
 

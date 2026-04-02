@@ -73,6 +73,7 @@ def _memory_dashboard_stats() -> dict:
             },
             "trend": [],
             "top_countries": [],
+            "map_points": [],
             "recent_detections": [],
             "data_source": "memory",
         }
@@ -153,6 +154,23 @@ def get_dashboard_stats() -> dict:
                     """,
                 )
 
+                map_rows = _fetch_all(
+                    cursor,
+                    """
+                    SELECT
+                        latitude,
+                        longitude,
+                        detection_type,
+                        status,
+                        COUNT(*) AS total_scans
+                    FROM detection_results
+                    WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+                    GROUP BY latitude, longitude, detection_type, status
+                    ORDER BY MAX(created_at) DESC
+                    LIMIT 150
+                    """,
+                )
+
                 recent_rows = _fetch_all(
                     cursor,
                     """
@@ -230,6 +248,17 @@ def get_dashboard_stats() -> dict:
                         "threat_count": int(row.get("threat_count") or 0),
                     }
                     for row in country_rows
+                ],
+                "map_points": [
+                    {
+                        "latitude": float(row.get("latitude")),
+                        "longitude": float(row.get("longitude")),
+                        "detection_type": row.get("detection_type"),
+                        "status": row.get("status"),
+                        "total_scans": int(row.get("total_scans") or 0),
+                    }
+                    for row in map_rows
+                    if row.get("latitude") is not None and row.get("longitude") is not None
                 ],
                 "recent_detections": [
                     {

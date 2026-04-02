@@ -1,10 +1,16 @@
 import os
 from contextlib import contextmanager
 
-import pymysql
+try:
+    import pymysql
+except Exception:  # pragma: no cover - optional local dependency fallback
+    pymysql = None
 
 
 def _db_config() -> dict | None:
+    if pymysql is None:
+        return None
+
     host = os.getenv("MYSQLHOST")
     port = os.getenv("MYSQLPORT")
     user = os.getenv("MYSQLUSER")

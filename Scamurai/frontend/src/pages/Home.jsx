@@ -1,4 +1,7 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { getApiErrorMessage, getDashboard } from "../api/scamurai_api";
+import ThreatMap from "../components/ThreatMap";
 
 const actionCards = [
   {
@@ -47,6 +50,37 @@ const highlights = [
 ];
 
 export default function Home() {
+  const [mapPoints, setMapPoints] = useState([]);
+  const [mapError, setMapError] = useState("");
+
+  useEffect(() => {
+    let active = true;
+
+    getDashboard()
+      .then((data) => {
+        if (!active) {
+          return;
+        }
+
+        setMapPoints(Array.isArray(data?.map_points) ? data.map_points : []);
+        setMapError("");
+      })
+      .catch((error) => {
+        if (!active) {
+          return;
+        }
+
+        setMapPoints([]);
+        setMapError(
+          getApiErrorMessage(error, "Could not load live world map activity.")
+        );
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div className="page-shell page">
       <section className="hero-panel">
@@ -108,6 +142,37 @@ export default function Home() {
               <div className="action-card__meta">Open page</div>
             </Link>
           ))}
+        </div>
+      </section>
+
+      <section className="panel panel--subtle">
+        <div className="page-header">
+          <div className="page-header__content">
+            <p className="eyebrow">Live Activity Map</p>
+            <h2 className="page-title" style={{ fontSize: "2rem" }}>
+              Global detection activity from live user scans
+            </h2>
+            <p className="page-description">
+              Each point represents stored detections geolocated from request IPs.
+              Larger dots mean more scans from the same location.
+            </p>
+          </div>
+        </div>
+
+        {mapError ? (
+          <div className="feedback feedback--error" style={{ marginTop: "1rem" }}>
+            {mapError}
+          </div>
+        ) : null}
+
+        <div style={{ marginTop: "1rem" }}>
+          <ThreatMap points={mapPoints} />
+        </div>
+
+        <div className="chip-row">
+          <span className="chip chip--danger">Threat</span>
+          <span className="chip chip--warning">Suspicious</span>
+          <span className="chip">Safe / Other</span>
         </div>
       </section>
 
