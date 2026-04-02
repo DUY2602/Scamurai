@@ -927,6 +927,10 @@ img {
   padding-bottom: 0;
 }
 
+.metric-row--stack {
+  align-items: flex-start;
+}
+
 .metric-row__label {
   color: var(--muted);
   font-weight: 700;
@@ -935,6 +939,15 @@ img {
 .metric-row__value {
   color: var(--text);
   font-weight: 800;
+}
+
+.dashboard-meta {
+  display: grid;
+  justify-items: end;
+  gap: 0.2rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  text-align: right;
 }
 
 @media (max-width: 1024px) {
@@ -956,6 +969,11 @@ img {
   .kv-grid,
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-meta {
+    justify-items: start;
+    text-align: left;
   }
 
 }

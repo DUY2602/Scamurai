@@ -97,6 +97,46 @@ function getReadableEntries(source) {
   });
 }
 
+function formatDateLabel(value) {
+  if (!value) {
+    return "Unknown";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "Unknown time";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return String(value);
+  }
+
+  return date.toLocaleString();
+}
+
+function truncateValue(value, maxLength = 64) {
+  if (!value) {
+    return "No source value";
+  }
+
+  const normalized = String(value);
+  return normalized.length > maxLength
+    ? `${normalized.slice(0, maxLength - 1)}...`
+    : normalized;
+}
+
 export default function Dashboard() {
   const [stats, setStats] = useState({});
   const [metrics, setMetrics] = useState({});
@@ -137,12 +177,18 @@ export default function Dashboard() {
   }, []);
 
   const summary = getSummary(stats);
+  const dataSource = stats?.data_source || "unknown";
   const typeCards = ["url", "file", "email"]
     .map((type) => ({
       type,
       entries: getReadableEntries(getTypeStats(stats, type)),
     }))
     .filter((item) => item.entries.length > 0);
+  const trendRows = Array.isArray(stats?.trend) ? stats.trend : [];
+  const topCountries = Array.isArray(stats?.top_countries) ? stats.top_countries : [];
+  const recentDetections = Array.isArray(stats?.recent_detections)
+    ? stats.recent_detections
+    : [];
 
   return (
     <div className="page-shell page">
@@ -152,7 +198,7 @@ export default function Dashboard() {
             Refresh
           </button>
         }
-        description="This page combines scan summaries and model metrics. It also stays graceful when the backend still returns zeros or empty objects."
+        description={`This dashboard now reads live detection history from the backend database when available. Current source: ${dataSource}.`}
         eyebrow="Dashboard"
         title="Monitor scan counts and model health"
       />
@@ -207,6 +253,100 @@ export default function Dashboard() {
               Once the backend returns URL, file, or email buckets, Scamurai will
               render them as compact cards here.
             </p>
+          </div>
+        )}
+      </section>
+
+      <section className="grid grid--two">
+        <article className="panel">
+          <h2 className="panel__title">7-day detection trend</h2>
+          <p className="panel__description">
+            Daily totals come from the database. Total scans and threats are shown side by side.
+          </p>
+
+          {trendRows.length ? (
+            <div className="metric-list" style={{ marginTop: "1rem" }}>
+              {trendRows.map((row) => (
+                <div className="metric-row" key={row.day}>
+                  <span className="metric-row__label">{formatDateLabel(row.day)}</span>
+                  <span className="metric-row__value">
+                    {row.total_scans} total / {row.threat_count} threats
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-card" style={{ marginTop: "1rem" }}>
+              <h3>No trend data yet</h3>
+              <p>Run a few detections and the database-backed trend view will fill in.</p>
+            </div>
+          )}
+        </article>
+
+        <article className="panel">
+          <h2 className="panel__title">Top countries</h2>
+          <p className="panel__description">
+            These countries are inferred from request IP geolocation captured during scans.
+          </p>
+
+          {topCountries.length ? (
+            <div className="metric-list" style={{ marginTop: "1rem" }}>
+              {topCountries.map((country) => (
+                <div
+                  className="metric-row"
+                  key={`${country.country_code || "xx"}-${country.country_name || "unknown"}`}
+                >
+                  <span className="metric-row__label">
+                    {country.country_name || "Unknown"}
+                  </span>
+                  <span className="metric-row__value">
+                    {country.total_scans} scans / {country.threat_count} threats
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-card" style={{ marginTop: "1rem" }}>
+              <h3>No country data yet</h3>
+              <p>
+                Once requests come from public IPs and database logging is active, country
+                totals will appear here.
+              </p>
+            </div>
+          )}
+        </article>
+      </section>
+
+      <section className="panel">
+        <h2 className="panel__title">Recent detections</h2>
+        <p className="panel__description">
+          Latest records stored in the database, including status and risk score.
+        </p>
+
+        {recentDetections.length ? (
+          <div className="metric-list" style={{ marginTop: "1rem" }}>
+            {recentDetections.map((item) => (
+              <div className="metric-row metric-row--stack" key={item.id}>
+                <div>
+                  <div className="metric-row__value">
+                    {formatLabel(item.detection_type)} / {item.verdict || item.status}
+                  </div>
+                  <div className="metric-row__label">
+                    {truncateValue(item.source_value)}
+                  </div>
+                </div>
+                <div className="dashboard-meta">
+                  <span>{item.risk_score ?? 0}%</span>
+                  <span>{item.country_name || "Unknown country"}</span>
+                  <span>{formatDateTime(item.created_at)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-card" style={{ marginTop: "1rem" }}>
+            <h3>No detections stored yet</h3>
+            <p>As soon as database inserts start landing, the latest scan history will show up here.</p>
           </div>
         )}
       </section>

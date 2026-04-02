@@ -9,3 +9,5 @@ pefile
 python-multipart
 pandas
 numpy
+requests
+PyMySQL
