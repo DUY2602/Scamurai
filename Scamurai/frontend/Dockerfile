@@ -8,7 +8,8 @@ RUN npm install
 COPY . .
 
 RUN npm run build
+RUN chmod +x /app/docker-entrypoint.sh
 
 EXPOSE 4173
 
-CMD ["sh", "-c", "npm run preview -- --host 0.0.0.0 --port ${PORT:-4173}"]
+CMD ["/app/docker-entrypoint.sh"]

@@ -1,6 +1,8 @@
 import axios from "axios";
 
+const runtimeApiBaseUrl = globalThis?.__APP_CONFIG__?.VITE_API_BASE_URL;
 const API_BASE_URL =
+  runtimeApiBaseUrl ??
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.DEV ? "http://localhost:8000" : "/api");
 
