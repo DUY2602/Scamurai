@@ -181,3 +181,41 @@ This repo now includes a Vercel setup that serves:
 ### Important note
 
 The backend uses `lightgbm`, `xgboost`, `scikit-learn`, and bundled model files. If Vercel rejects the deployment because of Python package size or serverless runtime limits, the code/config is still correct, but you may need a less restrictive backend host such as Railway, Render, or Fly.io and point `VITE_API_BASE_URL` there.
+
+## Deploy On Railway (2 Services)
+
+Recommended split:
+
+- `backend` service on Railway using the repo root
+- `frontend` service on Railway using `Scamurai/frontend`
+
+### Backend service
+
+- Root directory: repository root
+- Builder: Nixpacks
+- Railway will read [nixpacks.toml](/d:/Assignment%203/nixpacks.toml)
+- Start command runs `uvicorn backend.main:app --app-dir Scamurai`
+
+Environment variables:
+
+- `ALLOWED_ORIGINS=https://your-frontend-domain.up.railway.app`
+
+### Frontend service
+
+- Root directory: `Scamurai/frontend`
+- Builder: Nixpacks
+- Railway will read [Scamurai/frontend/nixpacks.toml](/d:/Assignment%203/Scamurai/frontend/nixpacks.toml)
+
+Environment variables:
+
+- `VITE_API_BASE_URL=https://your-backend-domain.up.railway.app`
+
+### Deployment order
+
+1. Deploy backend first
+2. Copy backend public URL
+3. Add `VITE_API_BASE_URL` to frontend service
+4. Deploy frontend
+5. Copy frontend public URL
+6. Add that URL to backend `ALLOWED_ORIGINS`
+7. Redeploy backend once more

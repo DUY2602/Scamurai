@@ -1,9 +1,0 @@
-.git
-.venv
-__pycache__
-Email\spamassassin_parsed.csv
-Email\models\X_features.npy
-Email\training
-FILE\training
-URL\training
-evaluation_full_report.json
