@@ -32,7 +32,6 @@ Thumbs.db
 !URL/models/.gitkeep
 
 # Local ML / cache artifacts
-*.joblib
 *.npy
 *.npz
 

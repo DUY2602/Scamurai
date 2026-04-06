@@ -17,7 +17,13 @@ class TextRequest(BaseModel):
 @router.post("/file")
 async def analyze_email_file(request: Request, file: UploadFile = File(...)):
     raw = await file.read()
-    result = predict_from_file(file.filename or "upload.eml", raw)
+    try:
+        result = predict_from_file(file.filename or "upload.eml", raw)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            503,
+            "Email detection model is unavailable on the server. Verify the Email/models deployment bundle.",
+        ) from exc
     record_scan("email", result)
     save_detection_result(
         detection_type="email",
@@ -33,7 +39,13 @@ def analyze_email_text(payload: TextRequest, request: Request):
     if not payload.subject and not payload.body:
         raise HTTPException(400, "Please provide an email subject or body before starting the scan.")
 
-    result = predict_from_text(payload.subject, payload.body)
+    try:
+        result = predict_from_text(payload.subject, payload.body)
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            503,
+            "Email detection model is unavailable on the server. Verify the Email/models deployment bundle.",
+        ) from exc
     record_scan("email", result)
     save_detection_result(
         detection_type="email",

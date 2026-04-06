@@ -1,7 +1,9 @@
 import argparse
 import html
 import math
+import os
 import re
+from functools import lru_cache
 from email import policy
 from email.parser import BytesParser
 from pathlib import Path
@@ -9,14 +11,7 @@ from urllib.parse import urlparse
 
 import joblib
 
-from backend.services.asset_paths import find_asset_dir
-
-MODEL_DIR = find_asset_dir(Path(__file__), "Email", "models")
-MODEL_ARTIFACT = joblib.load(MODEL_DIR / "spam_model.joblib")
-VECTORIZER = MODEL_ARTIFACT["vectorizer"]
-CLASSIFIER = MODEL_ARTIFACT["classifier"]
-LABEL_MAP = MODEL_ARTIFACT.get("label_map", {0: "ham", 1: "spam"})
-DEFAULT_THRESHOLD = float(MODEL_ARTIFACT.get("threshold", 0.5))
+MODEL_FILENAME = "spam_model.joblib"
 
 PHISHING_SIGNAL_WEIGHTS = {
     "credential": {
@@ -103,6 +98,56 @@ TRUSTED_SENDER_HINTS = (
     "cisco.com",
     "vocareum.com",
 )
+
+
+def _candidate_model_dirs(start: Path) -> list[Path]:
+    resolved = start.resolve()
+    search_roots = [resolved.parent, *resolved.parents]
+    seen: set[Path] = set()
+    candidates: list[Path] = []
+
+    for root in search_roots:
+        for candidate in (
+            root / "Email" / "models",
+            root / "models",
+        ):
+            if candidate not in seen:
+                seen.add(candidate)
+                candidates.append(candidate)
+
+    return candidates
+
+
+def _resolve_model_path() -> Path:
+    env_override = os.getenv("EMAIL_MODEL_PATH")
+    env_path = Path(env_override).expanduser() if env_override else None
+    if env_path:
+        if env_path.is_dir():
+            env_path = env_path / MODEL_FILENAME
+        if env_path.exists():
+            return env_path
+        raise FileNotFoundError(f"EMAIL_MODEL_PATH does not exist: {env_path}")
+
+    for model_dir_candidate in _candidate_model_dirs(Path(__file__)):
+        candidate = model_dir_candidate / MODEL_FILENAME
+        if candidate.exists():
+            return candidate
+
+    searched = ", ".join(str(path / MODEL_FILENAME) for path in _candidate_model_dirs(Path(__file__)))
+    raise FileNotFoundError(
+        f"Email model artifact '{MODEL_FILENAME}' was not found. Searched: {searched}"
+    )
+
+
+@lru_cache(maxsize=1)
+def _get_model_components() -> tuple[object, object, dict, float]:
+    model_path = _resolve_model_path()
+    model_artifact = joblib.load(model_path)
+    vectorizer = model_artifact["vectorizer"]
+    classifier = model_artifact["classifier"]
+    label_map = model_artifact.get("label_map", {0: "ham", 1: "spam"})
+    default_threshold = float(model_artifact.get("threshold", 0.5))
+    return vectorizer, classifier, label_map, default_threshold
 
 
 def strip_html(html_text: str) -> str:
@@ -245,24 +290,25 @@ def blend_model_with_semantics(model_probability: float, semantic_signals: dict)
 
 
 def predict_email_parts(subject: str, body: str, threshold: float | None = None, sender: str = "") -> dict:
+    vectorizer, classifier, label_map, default_threshold = _get_model_components()
     combined_text = f"{subject}\n{body}".strip()
     cleaned_text = clean_text(combined_text)
     if not cleaned_text:
         raise ValueError("Could not extract usable text from the email.")
 
-    active_threshold = DEFAULT_THRESHOLD if threshold is None else float(threshold)
-    features = VECTORIZER.transform([cleaned_text])
+    active_threshold = default_threshold if threshold is None else float(threshold)
+    features = vectorizer.transform([cleaned_text])
 
-    if hasattr(CLASSIFIER, "predict_proba"):
-        model_spam_probability = float(CLASSIFIER.predict_proba(features)[0][1])
+    if hasattr(classifier, "predict_proba"):
+        model_spam_probability = float(classifier.predict_proba(features)[0][1])
     else:
-        model_spam_probability = 1.0 if int(CLASSIFIER.predict(features)[0]) == 1 else 0.0
+        model_spam_probability = 1.0 if int(classifier.predict(features)[0]) == 1 else 0.0
 
     semantic_signals = score_semantic_signals(subject, body, sender=sender)
     spam_probability = blend_model_with_semantics(model_spam_probability, semantic_signals)
 
     predicted_index = 1 if spam_probability >= active_threshold else 0
-    predicted_label = str(LABEL_MAP.get(predicted_index, predicted_index)).lower()
+    predicted_label = str(label_map.get(predicted_index, predicted_index)).lower()
 
     reasons = [
         "spam probability is above the decision threshold"
