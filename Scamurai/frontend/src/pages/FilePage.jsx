@@ -42,7 +42,7 @@ export default function FilePage() {
       setError(
         getApiErrorMessage(
           requestError,
-          "The file scan failed. Please try another file or check the backend."
+          "The file scan could not be completed. Please try a supported executable file and run the scan again."
         )
       );
     } finally {
@@ -64,6 +64,7 @@ export default function FilePage() {
             <label className="field" htmlFor="file-input">
               <span className="field__label">Choose a file</span>
               <input
+                accept=".exe,application/x-msdownload"
                 className="field__file"
                 id="file-input"
                 onChange={(event) => {
@@ -75,8 +76,8 @@ export default function FilePage() {
             </label>
 
             <p className="helper-text">
-              Scamurai currently supports single-file uploads through the backend
-              analysis endpoint.
+              Scamurai currently supports single `.exe` uploads through the backend
+              malware analysis endpoint.
             </p>
 
             {selectedFile ? (

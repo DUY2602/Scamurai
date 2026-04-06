@@ -43,6 +43,16 @@ LEGACY_ARTIFACT_FILES = [
 HARDCASE_URLS: list[dict[str, Any]] = [
     {"url": "https://www.google.com", "target": "benign", "weight": 40.0},
     {
+        "url": "https://www.google.com/search?q=RESTful&oq=RESTful&gs_lcrp=EgZjaHJvbWUyBggAEEUYOTIGCAEQRRg7MgYIAhBFGDvSAQgzMDU5ajBqN6gCALACAA&sourceid=chrome&ie=UTF-8",
+        "target": "benign",
+        "weight": 95.0,
+    },
+    {
+        "url": "https://www.google.com/search?q=paypal+login+help&sourceid=chrome&ie=UTF-8",
+        "target": "benign",
+        "weight": 80.0,
+    },
+    {
         "url": "https://mail.google.com/mail/u/0/#search/github/FMfcgzQfBsvSLljXgwBfwMRBPkgBQZMN",
         "target": "benign",
         "weight": 70.0,

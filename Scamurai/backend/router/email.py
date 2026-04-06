@@ -31,7 +31,7 @@ async def analyze_email_file(request: Request, file: UploadFile = File(...)):
 @router.post("/text")
 def analyze_email_text(payload: TextRequest, request: Request):
     if not payload.subject and not payload.body:
-        raise HTTPException(400, "Can co subject hoac body")
+        raise HTTPException(400, "Please provide an email subject or body before starting the scan.")
 
     result = predict_from_text(payload.subject, payload.body)
     record_scan("email", result)

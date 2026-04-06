@@ -1,10 +1,11 @@
 import joblib
+import math
 import pandas as pd
 import pefile
-import tempfile
 from pathlib import Path
 
 from backend.services.asset_paths import find_asset_dir
+from backend.services.model_runtime import classify_status, load_file_thresholds
 
 MODEL_DIR = find_asset_dir(Path(__file__), "FILE", "models")
 
@@ -29,32 +30,55 @@ SENSITIVE_APIS = {
     b"CreateRemoteThread",
     b"WriteProcessMemory",
     b"VirtualAllocEx",
+    b"LoadLibraryA",
+    b"LoadLibraryW",
+    b"GetProcAddress",
+    b"CreateProcessA",
+    b"CreateProcessW",
+    b"WinExec",
+    b"ShellExecuteA",
+    b"ShellExecuteW",
     b"InternetOpen",
     b"HttpSendRequest",
+    b"URLDownloadToFileA",
+    b"URLDownloadToFileW",
+    b"WSAStartup",
+    b"connect",
+    b"send",
+    b"recv",
+    b"RegOpenKeyExA",
+    b"RegSetValueExA",
+    b"RegCreateKeyExA",
     b"SetWindowsHookEx",
+    b"CreateToolhelp32Snapshot",
+    b"Process32First",
+    b"Process32Next",
+    b"IsDebuggerPresent",
 }
+THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD = load_file_thresholds(Path(__file__))
 
 
-def classify_status(risk_score: float) -> str:
-    if risk_score >= 70:
-        return "threat"
-    if risk_score >= 40:
-        return "suspicious"
-    return "safe"
+class FileScanError(Exception):
+    pass
 
 
 def probability_confidence(probability: float) -> float:
     return round(max(probability, 1 - probability) * 100, 2)
 
 
+def normalize_risk_score(probability_percent: float) -> float:
+    return int(max(0, min(100, math.ceil(probability_percent))))
+
+
 def extract_features(raw: bytes, filename: str) -> dict:
-    suffix = Path(filename).suffix or ".bin"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as handle:
-        handle.write(raw)
-        temp_path = Path(handle.name)
+    try:
+        pe = pefile.PE(data=raw)
+    except pefile.PEFormatError as exc:
+        raise FileScanError(f"'{filename}' is not a valid PE executable or is too malformed to inspect.") from exc
+    except Exception as exc:
+        raise FileScanError(f"Could not parse '{filename}' as a Windows PE file.") from exc
 
     try:
-        pe = pefile.PE(str(temp_path))
         sections = len(pe.sections)
         entropies = [section.get_entropy() for section in pe.sections]
         avg_entropy = sum(entropies) / sections if sections else 0.0
@@ -78,7 +102,6 @@ def extract_features(raw: bytes, filename: str) -> dict:
         has_version_info = 1 if hasattr(pe, "VS_FIXEDFILEINFO") else 0
         image_base = int(pe.OPTIONAL_HEADER.ImageBase)
         size_of_image = int(pe.OPTIONAL_HEADER.SizeOfImage)
-        pe.close()
         return {
             "Sections": sections,
             "AvgEntropy": round(avg_entropy, 4),
@@ -92,20 +115,25 @@ def extract_features(raw: bytes, filename: str) -> dict:
             "HasVersionInfo": has_version_info,
         }
     finally:
-        temp_path.unlink(missing_ok=True)
+        if "pe" in locals():
+            pe.close()
 
 
 def predict_file(filename: str, raw: bytes) -> dict:
     features = extract_features(raw, filename)
     frame = pd.DataFrame([features])[FEATURES]
-    scaled = scaler.transform(frame)
+    scaled = pd.DataFrame(
+        scaler.transform(frame),
+        columns=FEATURES,
+        index=frame.index,
+    )
 
     lgbm_prob = float(lgbm.predict_proba(scaled)[0][1]) if hasattr(lgbm, "predict_proba") else None
     xgb_prob = float(xgb.predict_proba(scaled)[0][1]) if hasattr(xgb, "predict_proba") else None
 
     if lgbm_prob is not None and xgb_prob is not None:
         avg_prob = (lgbm_prob + xgb_prob) / 2
-        risk_score = round(avg_prob * 100, 2)
+        risk_score = normalize_risk_score(avg_prob * 100)
         confidence = probability_confidence(avg_prob)
         model_agreement = "high" if abs(lgbm_prob - xgb_prob) <= 0.15 else "mixed"
     else:
@@ -113,14 +141,18 @@ def predict_file(filename: str, raw: bytes) -> dict:
         xgb_pred = int(xgb.predict(scaled)[0])
         avg_prob = None
         vote_ratio = (lgbm_pred + xgb_pred) / 2
-        risk_score = round(vote_ratio * 100, 2)
+        risk_score = normalize_risk_score(vote_ratio * 100)
         confidence = probability_confidence(vote_ratio)
         model_agreement = "high" if lgbm_pred == xgb_pred else "mixed"
 
-    status = classify_status(risk_score)
+    predicted_class = (
+        "malware"
+        if (avg_prob is not None and avg_prob >= 0.5) or (avg_prob is None and risk_score >= 50)
+        else "benign"
+    )
+    status = classify_status(risk_score, THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD)
     verdict = "MALWARE" if status == "threat" else ("SUSPICIOUS" if status == "suspicious" else "BENIGN")
-    predicted_class = "malware" if (avg_prob is not None and avg_prob >= 0.5) or (avg_prob is None and risk_score >= 50) else "benign"
-    decision_threshold = 70
+    decision_threshold = round(THREAT_THRESHOLD, 2)
     key_features = {
         "Sections": features["Sections"],
         "AvgEntropy": features["AvgEntropy"],

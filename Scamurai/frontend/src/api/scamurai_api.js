@@ -4,7 +4,7 @@ const runtimeApiBaseUrl = globalThis?.__APP_CONFIG__?.VITE_API_BASE_URL;
 const API_BASE_URL =
   runtimeApiBaseUrl ??
   import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.DEV ? "http://localhost:8000" : "/api");
+  (import.meta.env.DEV ? "http://127.0.0.1:8000" : "/api");
 const SESSION_STORAGE_KEY = "scamurai_session_id";
 
 function createSessionId() {
@@ -48,6 +48,7 @@ export function getApiErrorMessage(
 ) {
   if (axios.isAxiosError(error)) {
     const responseData = error.response?.data;
+    const status = error.response?.status;
 
     if (typeof responseData === "string") {
       return responseData;
@@ -61,8 +62,36 @@ export function getApiErrorMessage(
       return responseData.message;
     }
 
+    if (error.code === "ECONNABORTED") {
+      return "The request took too long to finish. Please try again in a moment.";
+    }
+
     if (!error.response) {
-      return `Cannot connect to the backend at ${API_BASE_URL}. Make sure the server is running.`;
+      return `Scamurai could not reach the API service at ${API_BASE_URL}. Please make sure the backend server is running and try again.`;
+    }
+
+    if (status === 400) {
+      return "The request could not be processed. Please review your input and try again.";
+    }
+
+    if (status === 404) {
+      return "The requested API endpoint was not found. Please check the current backend route configuration.";
+    }
+
+    if (status === 413) {
+      return "The uploaded file is too large for the current API limits. Please choose a smaller file.";
+    }
+
+    if (status === 422) {
+      return "The submitted data is incomplete or has an invalid format. Please check your input and try again.";
+    }
+
+    if (status === 429) {
+      return "Too many requests were sent in a short time. Please wait a moment and try again.";
+    }
+
+    if (status >= 500) {
+      return "The server encountered an internal error while processing the request. Please try again shortly.";
     }
   }
 
@@ -87,10 +116,16 @@ export function analyzeEmailText(subject, body) {
   );
 }
 
-export function getDashboard() {
-  return API.get("/dashboard/stats").then((response) => response.data);
+export function getDashboard(range = "week") {
+  return API.get("/dashboard/stats", {
+    params: { range },
+  }).then((response) => response.data);
 }
 
 export function getMetrics() {
   return API.get("/dashboard/model-metrics").then((response) => response.data);
+}
+
+export function getDatasetInsights() {
+  return API.get("/dashboard/dataset-insights").then((response) => response.data);
 }

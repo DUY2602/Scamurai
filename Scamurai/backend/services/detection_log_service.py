@@ -1,4 +1,12 @@
-from backend.services.db_service import get_connection
+import logging
+
+from backend.services.supabase_service import (
+    build_detection_payload,
+    insert_detection_result as insert_supabase_detection_result,
+    is_supabase_enabled,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def save_detection_result(
@@ -8,51 +16,17 @@ def save_detection_result(
     session_id: str | None = None,
 ) -> None:
     location = location or {}
-
-    query = """
-        INSERT INTO detection_results (
-            session_id,
-            detection_type,
-            source_value,
-            status,
-            verdict,
-            is_malicious,
-            is_suspicious,
-            risk_score,
-            confidence,
-            country_code,
-            country_name,
-            city,
-            latitude,
-            longitude
-        ) VALUES (
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-        )
-    """
-
-    values = (
-        session_id,
-        detection_type,
-        result.get("source_value"),
-        result.get("status"),
-        result.get("verdict"),
-        bool(result.get("is_malicious") or result.get("is_spam")),
-        bool(result.get("is_suspicious")),
-        int(float(result.get("risk_score", 0) or 0)),
-        float(result.get("confidence", 0) or 0),
-        location.get("country_code"),
-        location.get("country_name"),
-        location.get("city"),
-        location.get("latitude"),
-        location.get("longitude"),
+    payload = build_detection_payload(
+        detection_type=detection_type,
+        result=result,
+        location=location,
+        session_id=session_id,
     )
 
-    try:
-        with get_connection() as connection:
-            if connection is None:
-                return
-
-            with connection.cursor() as cursor:
-                cursor.execute(query, values)
-    except Exception:
+    if is_supabase_enabled():
+        if insert_supabase_detection_result(payload):
+            return
+        logger.warning("Skipping detection log write for %s after Supabase insert failure.", detection_type)
         return
+
+    logger.info("Skipping detection log write for %s because Supabase is not configured.", detection_type)

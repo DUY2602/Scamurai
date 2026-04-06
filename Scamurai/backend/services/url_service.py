@@ -1,8 +1,10 @@
 import joblib
+import math
 import pandas as pd
 from pathlib import Path
 
 from backend.services.asset_paths import find_asset_dir
+from backend.services.model_runtime import classify_status, load_url_thresholds
 
 MODEL_DIR = find_asset_dir(Path(__file__), "URL", "models")
 
@@ -10,18 +12,15 @@ lgbm = joblib.load(MODEL_DIR / "lgbm_model.pkl")
 xgb = joblib.load(MODEL_DIR / "xgb_model.pkl")
 scaler = joblib.load(MODEL_DIR / "scaler.pkl")
 feature_names = joblib.load(MODEL_DIR / "feature_names.pkl")
-
-
-def classify_status(risk_score: float) -> str:
-    if risk_score >= 70:
-        return "threat"
-    if risk_score >= 40:
-        return "suspicious"
-    return "safe"
+THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD = load_url_thresholds(Path(__file__))
 
 
 def probability_confidence(probability: float) -> float:
     return round(max(probability, 1 - probability) * 100, 2)
+
+
+def normalize_risk_score(probability_percent: float) -> float:
+    return int(max(0, min(100, math.ceil(probability_percent))))
 
 
 def extract_features(url: str) -> dict:
@@ -89,18 +88,22 @@ def extract_features(url: str) -> dict:
 def predict_url(url: str) -> dict:
     features = extract_features(url)
     frame = pd.DataFrame([features])[feature_names]
-    scaled = scaler.transform(frame)
+    scaled = pd.DataFrame(
+        scaler.transform(frame),
+        columns=feature_names,
+        index=frame.index,
+    )
 
     lgbm_prob = float(lgbm.predict_proba(scaled)[0][1])
     xgb_prob = float(xgb.predict_proba(scaled)[0][1])
     avg_prob = (lgbm_prob + xgb_prob) / 2
 
-    risk_score = round(avg_prob * 100, 2)
+    risk_score = normalize_risk_score(avg_prob * 100)
     confidence = probability_confidence(avg_prob)
-    status = classify_status(risk_score)
+    status = classify_status(risk_score, THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD)
     verdict = "MALICIOUS" if status == "threat" else ("SUSPICIOUS" if status == "suspicious" else "BENIGN")
     predicted_class = "malicious" if avg_prob >= 0.5 else "benign"
-    decision_threshold = 70
+    decision_threshold = round(THREAT_THRESHOLD, 2)
     model_agreement = "high" if abs(lgbm_prob - xgb_prob) <= 0.15 else "mixed"
     key_features = {
         "keyword_count": features["keyword_count"],

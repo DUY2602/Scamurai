@@ -46,7 +46,7 @@ export default function EmailPage() {
       setError(
         getApiErrorMessage(
           requestError,
-          "The email text scan failed. Please try again."
+          "The email text scan could not be completed. Please review the content and try again."
         )
       );
     } finally {
@@ -75,7 +75,7 @@ export default function EmailPage() {
       setError(
         getApiErrorMessage(
           requestError,
-          "The email file scan failed. Please check the backend and try again."
+          "The email file scan could not be completed. Please try a valid .eml file and run the scan again."
         )
       );
     } finally {

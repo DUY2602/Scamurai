@@ -2,7 +2,7 @@ from fastapi import APIRouter, File, HTTPException, Request, UploadFile
 
 from backend.services.dashboard_service import record_scan
 from backend.services.detection_log_service import save_detection_result
-from backend.services.file_service import predict_file
+from backend.services.file_service import FileScanError, predict_file
 from backend.services.geo_service import get_client_ip, lookup_ip_location
 
 router = APIRouter()
@@ -11,13 +11,17 @@ router = APIRouter()
 @router.post("")
 async def analyze_file(request: Request, file: UploadFile = File(...)):
     if not file.filename:
-        raise HTTPException(400, "File khong co ten")
+        raise HTTPException(400, "The uploaded file is missing a filename.")
 
     raw = await file.read()
     if not raw:
-        raise HTTPException(400, "File rong")
+        raise HTTPException(400, "The uploaded file is empty.")
 
-    result = predict_file(file.filename, raw)
+    try:
+        result = predict_file(file.filename, raw)
+    except FileScanError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
     record_scan("file", result)
     save_detection_result(
         detection_type="file",

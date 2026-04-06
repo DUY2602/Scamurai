@@ -11,6 +11,9 @@ function formatLabel(label) {
 
 function formatMetricValue(value, key = "") {
   const normalizedKey = key.toLowerCase();
+  const isPercentAlreadyScaled = ["risk_score", "confidence", "score"].includes(
+    normalizedKey
+  );
 
   if (typeof value === "boolean") {
     return value ? "Yes" : "No";
@@ -28,8 +31,12 @@ function formatMetricValue(value, key = "") {
     ].some((token) => normalizedKey.includes(token));
 
     if (shouldFormatAsPercent) {
-      const percentValue = value <= 1 ? value * 100 : value;
-      return `${percentValue.toFixed(percentValue >= 10 ? 1 : 2)}%`;
+      const percentValue =
+        !isPercentAlreadyScaled && value <= 1 ? value * 100 : value;
+      const formattedPercent = percentValue
+        .toFixed(percentValue >= 10 ? 1 : 2)
+        .replace(/\.?0+$/, "");
+      return `${formattedPercent}%`;
     }
 
     if (Number.isInteger(value)) {
@@ -44,6 +51,38 @@ function formatMetricValue(value, key = "") {
   }
 
   return String(value);
+}
+
+function normalizeScoreValue(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.max(0, Math.min(100, value));
+  }
+
+  if (typeof value === "string") {
+    const cleaned = value.replace("%", "").trim();
+    const parsed = Number(cleaned);
+    if (Number.isFinite(parsed)) {
+      return Math.max(0, Math.min(100, parsed));
+    }
+  }
+
+  return null;
+}
+
+function toneFromScore(score) {
+  if (score === null) {
+    return null;
+  }
+
+  if (score >= 70) {
+    return "danger";
+  }
+
+  if (score >= 40) {
+    return "warning";
+  }
+
+  return "safe";
 }
 
 function polarToCartesian(cx, cy, radius, angleInDegrees) {
@@ -69,7 +108,8 @@ function describeSemiDisk(cx, cy, radius) {
   return `M ${left.x} ${left.y} A ${radius} ${radius} 0 0 1 ${right.x} ${right.y} L ${cx} ${cy} Z`;
 }
 
-function getTone(status, data) {
+function getTone(status, data, numericScore) {
+  const scoreTone = toneFromScore(numericScore);
   const statusPool = [
     status,
     data?.verdict,
@@ -93,22 +133,30 @@ function getTone(status, data) {
     return "warning";
   }
 
-  if (/(benign|safe|clean|ham|trusted|legit)/.test(statusPool)) {
+  if (/(benign|safe|clean|ham|trusted|legit)/.test(statusPool) && scoreTone !== "danger") {
     return "safe";
   }
 
   if (typeof data?.is_malicious === "boolean") {
-    return data.is_malicious ? "danger" : "safe";
+    if (data.is_malicious) {
+      return "danger";
+    }
   }
 
   if (typeof data?.is_spam === "boolean") {
-    return data.is_spam ? "danger" : "safe";
+    if (data.is_spam) {
+      return "danger";
+    }
+  }
+
+  if (scoreTone) {
+    return scoreTone;
   }
 
   return "neutral";
 }
 
-function getStatusText(status, data, tone) {
+function getStatusText(status, data, tone, numericScore) {
   const value =
     status ||
     data?.status ||
@@ -117,6 +165,23 @@ function getStatusText(status, data, tone) {
     data?.label;
 
   if (value) {
+    const normalizedValue = String(value).toLowerCase();
+    if (/(benign|safe|clean|ham|trusted|legit)/.test(normalizedValue)) {
+      return formatLabel(String(value));
+    }
+
+    if (numericScore !== null) {
+      const scoreTone = toneFromScore(numericScore);
+
+      if (scoreTone === "danger") {
+        return "Threat Detected";
+      }
+
+      if (scoreTone === "warning") {
+        return "Needs Review";
+      }
+    }
+
     return formatLabel(String(value));
   }
 
@@ -308,12 +373,15 @@ export default function ResultCard({ title, status, score, data }) {
     return null;
   }
 
-  const tone = getTone(status, data);
+  const rawScoreValue =
+    data?.risk_score ??
+    data?.score ??
+    (typeof score === "number" ? score : undefined);
+  const numericScore = normalizeScoreValue(rawScoreValue);
+  const tone = getTone(status, data, numericScore);
   const toneMeta = getToneMeta(tone);
   const gaugeMeta = getGaugeMeta(tone);
-  const statusText = getStatusText(status, data, tone);
-  const scoreValue = score ?? data?.risk_score;
-  const numericScore = Number.isFinite(Number(scoreValue)) ? Math.max(0, Math.min(100, Number(scoreValue))) : null;
+  const statusText = getStatusText(status, data, tone, numericScore);
   const needleAngle = numericScore === null ? 180 : 180 - (numericScore * 180) / 100;
   const needlePoint = polarToCartesian(160, 160, 102, needleAngle);
   const gaugeSegments = [
@@ -374,7 +442,7 @@ export default function ResultCard({ title, status, score, data }) {
           <h3>{title || "Prediction Details"}</h3>
           <p>{toneMeta.descriptor}</p>
         </div>
-        {scoreValue !== undefined && scoreValue !== null ? (
+      {numericScore !== null ? (
           <div className="result-card__summary">
             <div className="result-card__gauge-wrap">
               <div className="result-gauge" aria-hidden="true">
@@ -412,7 +480,7 @@ export default function ResultCard({ title, status, score, data }) {
               </div>
               <div className="result-card__score-readout">
                 <span>Risk Score</span>
-                <strong>{formatMetricValue(scoreValue, "risk_score")}</strong>
+                <strong>{formatMetricValue(numericScore, "risk_score")}</strong>
               </div>
               <p className="result-card__gauge-copy">{gaugeMeta.caption}</p>
             </div>

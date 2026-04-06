@@ -72,31 +72,32 @@ def load_split(path: Path) -> pd.DataFrame:
 
 
 def load_hardcase(path: Path) -> pd.DataFrame:
-    if path.is_file():
-        df = pd.read_csv(path)
-        if {"subject", "body"}.issubset(df.columns):
-            return df
-        records = []
-        for row in df.to_dict(orient="records"):
-            text = str(row.get("text", "") or "")
-            subject = ""
-            body = text
-            if text.lower().startswith("subject:") and " body:" in text.lower():
-                prefix, body = text.split(" Body:", 1)
-                subject = prefix.replace("Subject:", "", 1).strip()
-                body = body.strip()
-            records.append(
-                {
-                    "subject": subject,
-                    "body": body,
-                    "sender": "",
-                    "text": text,
-                    "label": str(row.get("label", "ham")).strip().lower(),
-                    "group": str(row.get("group", "unknown")).strip().lower(),
-                }
-            )
-        return pd.DataFrame(records)
-    raise FileNotFoundError(f"Missing expected hardcase file: {path}")
+    if not path.is_file():
+        return pd.DataFrame(columns=["subject", "body", "sender", "text", "label", "group"])
+
+    df = pd.read_csv(path)
+    if {"subject", "body"}.issubset(df.columns):
+        return df
+    records = []
+    for row in df.to_dict(orient="records"):
+        text = str(row.get("text", "") or "")
+        subject = ""
+        body = text
+        if text.lower().startswith("subject:") and " body:" in text.lower():
+            prefix, body = text.split(" Body:", 1)
+            subject = prefix.replace("Subject:", "", 1).strip()
+            body = body.strip()
+        records.append(
+            {
+                "subject": subject,
+                "body": body,
+                "sender": "",
+                "text": text,
+                "label": str(row.get("label", "ham")).strip().lower(),
+                "group": str(row.get("group", "unknown")).strip().lower(),
+            }
+        )
+    return pd.DataFrame(records)
 
 
 def prepare_split_frame(df: pd.DataFrame) -> pd.DataFrame:
@@ -141,6 +142,18 @@ def transform_features(features: pd.DataFrame, vectorizer: TfidfVectorizer, scal
     tfidf = vectorizer.transform(features["full_clean_text"])
     numeric = scaler.transform(features[NUMERIC_FEATURES])
     return hstack([tfidf, csr_matrix(numeric)]).tocsr()
+
+
+def evaluate_empty_split() -> dict[str, Any]:
+    return {
+        "classification_report": {},
+        "confusion_matrix": [],
+        "roc_auc": None,
+        "macro_f1": 0.0,
+        "spam_f1": 0.0,
+        "spam_precision": 0.0,
+        "spam_recall": 0.0,
+    }
 
 
 def build_model_factory(name: str):
@@ -202,7 +215,54 @@ def evaluate_predictions(model_name: str, split_name: str, y_true, y_pred, y_pro
         "confusion_matrix": matrix.tolist(),
         "roc_auc": None if np.isnan(roc_auc) else roc_auc,
         "macro_f1": float(report_dict["macro avg"]["f1-score"]),
+        "spam_f1": float(report_dict["spam"]["f1-score"]),
+        "spam_precision": float(report_dict["spam"]["precision"]),
+        "spam_recall": float(report_dict["spam"]["recall"]),
     }
+
+
+def threshold_candidates() -> list[float]:
+    coarse = [round(float(value), 2) for value in np.arange(0.25, 0.81, 0.05)]
+    fine = [0.35, 0.40, 0.45, 0.50, 0.55, 0.60]
+    return sorted(set(coarse + fine))
+
+
+def select_probability_threshold(y_true: np.ndarray, positive_prob: np.ndarray) -> tuple[float, dict[str, Any]]:
+    best_threshold: float | None = None
+    best_metrics: dict[str, Any] | None = None
+    best_score: tuple[float, float, float, float] | None = None
+
+    for threshold in threshold_candidates():
+        predictions = (positive_prob >= threshold).astype(int)
+        report = classification_report(
+            y_true,
+            predictions,
+            target_names=["ham", "spam"],
+            digits=4,
+            zero_division=0,
+            output_dict=True,
+        )
+        spam_metrics = report["spam"]
+        score = (
+            float(spam_metrics["recall"] >= 0.90 and spam_metrics["precision"] >= 0.85),
+            float(spam_metrics["f1-score"]),
+            float(spam_metrics["recall"]),
+            float(spam_metrics["precision"]),
+        )
+        if best_score is None or score > best_score:
+            best_score = score
+            best_threshold = float(threshold)
+            best_metrics = {
+                "threshold": float(threshold),
+                "classification_report": report,
+                "confusion_matrix": confusion_matrix(y_true, predictions).tolist(),
+                "roc_auc": float(roc_auc_score(y_true, positive_prob)) if len(np.unique(y_true)) > 1 else None,
+            }
+
+    if best_threshold is None or best_metrics is None:
+        raise RuntimeError("Could not select a probability threshold.")
+
+    return best_threshold, best_metrics
 
 
 def run_cross_validation(train_df: pd.DataFrame, label_encoder: LabelEncoder, cv_folds: int) -> dict[str, dict[str, float]]:
@@ -302,18 +362,17 @@ def main() -> None:
     train_features = featurize_dataframe(train_df)
     val_features = featurize_dataframe(val_df)
     test_features = featurize_dataframe(test_df)
-    hardcase_features = featurize_dataframe(hardcase_df)
     vectorizer, scaler = fit_vectorizer_and_scaler(train_features)
 
     X_train = transform_features(train_features, vectorizer, scaler)
     X_val = transform_features(val_features, vectorizer, scaler)
     X_test = transform_features(test_features, vectorizer, scaler)
-    X_hardcase = transform_features(hardcase_features, vectorizer, scaler)
+    X_hardcase = None if hardcase_df.empty else transform_features(featurize_dataframe(hardcase_df), vectorizer, scaler)
 
     y_train = label_encoder.transform(train_df["label"])
     y_val = label_encoder.transform(val_df["label"])
     y_test = label_encoder.transform(test_df["label"])
-    y_hardcase = label_encoder.transform(hardcase_df["label"])
+    y_hardcase = np.asarray([], dtype=int) if hardcase_df.empty else label_encoder.transform(hardcase_df["label"])
 
     candidate_models = {
         "lightgbm": build_model_factory("lightgbm")(),
@@ -321,16 +380,17 @@ def main() -> None:
         "linear_svc": build_model_factory("linear_svc")(),
     }
     evaluation_summary: dict[str, Any] = {"cv": cv_summary, "validation": {}, "hardcase": {}, "test": {}}
+    selected_thresholds: dict[str, float] = {}
 
     best_name = ""
     best_val_macro_f1 = -1.0
+    best_val_score: tuple[float, float, float] | None = None
     for model_name, model in candidate_models.items():
         model.fit(X_train, y_train)
-        val_pred = model.predict(X_val)
         val_proba = model.predict_proba(X_val)[:, 1]
-        hardcase_pred = model.predict(X_hardcase)
-        hardcase_proba = model.predict_proba(X_hardcase)[:, 1]
-
+        selected_threshold, threshold_metrics = select_probability_threshold(y_val, val_proba)
+        selected_thresholds[model_name] = selected_threshold
+        val_pred = (val_proba >= selected_threshold).astype(int)
         evaluation_summary["validation"][model_name] = evaluate_predictions(
             model_name,
             "validation",
@@ -339,18 +399,31 @@ def main() -> None:
             val_proba,
             label_encoder,
         )
-        evaluation_summary["hardcase"][model_name] = evaluate_predictions(
-            model_name,
-            "hardcase",
-            y_hardcase,
-            hardcase_pred,
-            hardcase_proba,
-            label_encoder,
-        )
+        evaluation_summary["validation"][model_name]["selected_threshold"] = selected_threshold
+        evaluation_summary["validation"][model_name]["threshold_selection"] = threshold_metrics
+        if X_hardcase is not None and len(y_hardcase):
+            hardcase_proba = model.predict_proba(X_hardcase)[:, 1]
+            hardcase_pred = (hardcase_proba >= selected_threshold).astype(int)
+            evaluation_summary["hardcase"][model_name] = evaluate_predictions(
+                model_name,
+                "hardcase",
+                y_hardcase,
+                hardcase_pred,
+                hardcase_proba,
+                label_encoder,
+            )
+        else:
+            evaluation_summary["hardcase"][model_name] = evaluate_empty_split()
 
-        macro_f1 = evaluation_summary["validation"][model_name]["macro_f1"]
-        if macro_f1 > best_val_macro_f1:
-            best_val_macro_f1 = macro_f1
+        validation_metrics = evaluation_summary["validation"][model_name]
+        model_score = (
+            validation_metrics["spam_f1"],
+            validation_metrics["spam_recall"],
+            evaluation_summary["hardcase"][model_name]["macro_f1"],
+        )
+        if best_val_score is None or model_score > best_val_score:
+            best_val_score = model_score
+            best_val_macro_f1 = validation_metrics["macro_f1"]
             best_name = model_name
 
     print(f"\nBest model selected on validation macro F1: {best_name} ({best_val_macro_f1:.4f})")
@@ -364,8 +437,9 @@ def main() -> None:
     best_model.fit(X_refit, y_refit)
 
     X_test_final = transform_features(test_features, vectorizer, scaler)
-    test_pred = best_model.predict(X_test_final)
     test_proba = best_model.predict_proba(X_test_final)[:, 1]
+    best_threshold = selected_thresholds[best_name]
+    test_pred = (test_proba >= best_threshold).astype(int)
     evaluation_summary["test"][best_name] = evaluate_predictions(
         best_name,
         "test",
@@ -374,9 +448,11 @@ def main() -> None:
         test_proba,
         label_encoder,
     )
+    evaluation_summary["test"][best_name]["selected_threshold"] = best_threshold
 
     metadata = {
         "selected_model": best_name,
+        "selected_threshold": best_threshold,
         "validation_macro_f1": best_val_macro_f1,
         "hardcase_macro_f1": evaluation_summary["hardcase"][best_name]["macro_f1"],
         "hardcase_save_threshold": HARDCASE_SAVE_THRESHOLD,
@@ -392,10 +468,13 @@ def main() -> None:
     save_json(DATA_DIR / "email_retrain_summary.json", evaluation_summary)
 
     hardcase_macro_f1 = float(evaluation_summary["hardcase"][best_name]["macro_f1"])
-    can_save = hardcase_macro_f1 >= HARDCASE_SAVE_THRESHOLD
+    hardcase_available = not hardcase_df.empty
+    can_save = (hardcase_macro_f1 >= HARDCASE_SAVE_THRESHOLD) if hardcase_available else True
     decision = "SAVE" if can_save and not args.no_save else "NOT SAVE"
     if args.no_save:
         decision_reason = "--no-save was set"
+    elif not hardcase_available:
+        decision_reason = "hardcase dataset missing, fallback to validation-selected model"
     elif not can_save:
         decision_reason = f"hardcase macro F1 below threshold {HARDCASE_SAVE_THRESHOLD:.2f}"
     else:

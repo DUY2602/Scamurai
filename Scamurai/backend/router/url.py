@@ -16,7 +16,7 @@ class UrlRequest(BaseModel):
 @router.post("")
 def analyze_url(payload: UrlRequest, request: Request):
     if not payload.url:
-        raise HTTPException(400, "URL khong duoc de trong")
+        raise HTTPException(400, "Please provide a URL before starting the scan.")
 
     result = predict_url(payload.url)
     record_scan("url", result)

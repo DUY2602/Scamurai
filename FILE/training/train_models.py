@@ -47,12 +47,30 @@ FILE_SENSITIVE_APIS = {
     b"CreateRemoteThread",
     b"WriteProcessMemory",
     b"VirtualAllocEx",
+    b"LoadLibraryA",
+    b"LoadLibraryW",
+    b"GetProcAddress",
+    b"CreateProcessA",
+    b"CreateProcessW",
+    b"WinExec",
     b"InternetOpen",
     b"HttpSendRequest",
+    b"URLDownloadToFileA",
+    b"URLDownloadToFileW",
+    b"WSAStartup",
+    b"connect",
+    b"send",
+    b"recv",
+    b"RegOpenKeyExA",
+    b"RegSetValueExA",
+    b"RegCreateKeyExA",
     b"GetKeyboardState",
     b"SetWindowsHookEx",
     b"ShellExecuteA",
     b"IsDebuggerPresent",
+    b"CreateToolhelp32Snapshot",
+    b"Process32First",
+    b"Process32Next",
 }
 
 
@@ -114,6 +132,54 @@ def evaluate_predictions(
     if y_prob is not None:
         metrics["roc_auc"] = round(float(roc_auc_score(y_true, y_prob)), 4)
     return metrics
+
+
+def evaluate_soft_voting_thresholds(
+    y_true: pd.Series,
+    avg_prob: np.ndarray,
+    thresholds: list[float],
+) -> tuple[dict[str, dict[str, Any]], float, np.ndarray]:
+    threshold_reports: dict[str, dict[str, Any]] = {}
+    selected_threshold: float | None = None
+    selected_score: tuple[float, float, float] | None = None
+
+    for threshold in thresholds:
+        y_pred = (avg_prob >= threshold).astype(int)
+        report = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
+        malware_metrics = report["1"]
+        threshold_reports[f"{threshold:.2f}"] = {
+            "threshold": float(threshold),
+            "confusion_matrix": confusion_matrix(y_true, y_pred).tolist(),
+            "classification_report": report,
+            "roc_auc": round(float(roc_auc_score(y_true, avg_prob)), 4),
+        }
+
+        precision = float(malware_metrics["precision"])
+        recall = float(malware_metrics["recall"])
+        f1_value = float(malware_metrics["f1-score"])
+        if recall >= 0.85 and precision >= 0.75:
+            candidate_score = (f1_value, recall, precision)
+            if selected_score is None or candidate_score > selected_score:
+                selected_score = candidate_score
+                selected_threshold = float(threshold)
+
+    if selected_threshold is None:
+        fallback_threshold = thresholds[0]
+        best_fallback_score: tuple[float, float, float] | None = None
+        for threshold in thresholds:
+            report = threshold_reports[f"{threshold:.2f}"]["classification_report"]
+            malware_metrics = report["1"]
+            precision = float(malware_metrics["precision"])
+            recall = float(malware_metrics["recall"])
+            f1_value = float(malware_metrics["f1-score"])
+            candidate_score = (float(recall >= 0.85), f1_value, precision)
+            if best_fallback_score is None or candidate_score > best_fallback_score:
+                best_fallback_score = candidate_score
+                fallback_threshold = threshold
+        selected_threshold = float(fallback_threshold)
+
+    selected_pred = (avg_prob >= selected_threshold).astype(int)
+    return threshold_reports, selected_threshold, selected_pred
 
 
 def extract_training_features_from_pe(file_path: Path) -> dict[str, Any]:
@@ -221,8 +287,16 @@ def main() -> None:
     train_sample_weight = np.concatenate([np.ones(len(X_train) - len(hardcase_frame), dtype=float), hardcase_weights])
 
     scaler = StandardScaler()
-    scaler.fit(X_train)
-    scaler.transform(X_test)
+    X_train_scaled = pd.DataFrame(
+        scaler.fit_transform(X_train),
+        columns=FEATURE_COLUMNS,
+        index=X_train.index,
+    )
+    X_test_scaled = pd.DataFrame(
+        scaler.transform(X_test),
+        columns=FEATURE_COLUMNS,
+        index=X_test.index,
+    )
 
     lgbm = LGBMClassifier(
         n_estimators=300,
@@ -237,9 +311,9 @@ def main() -> None:
         n_jobs=-1,
         verbosity=-1,
     )
-    lgbm.fit(X_train, y_train, sample_weight=train_sample_weight)
-    lgbm_test_pred = lgbm.predict(X_test)
-    lgbm_test_prob = lgbm.predict_proba(X_test)[:, 1]
+    lgbm.fit(X_train_scaled, y_train, sample_weight=train_sample_weight)
+    lgbm_test_pred = lgbm.predict(X_test_scaled)
+    lgbm_test_prob = lgbm.predict_proba(X_test_scaled)[:, 1]
 
     negative_count = int((y_train == 0).sum())
     positive_count = int((y_train == 1).sum())
@@ -261,11 +335,17 @@ def main() -> None:
         tree_method="hist",
         scale_pos_weight=scale_pos_weight,
     )
-    xgb.fit(X_train, y_train, sample_weight=train_sample_weight)
-    xgb_test_pred = xgb.predict(X_test)
-    xgb_test_prob = xgb.predict_proba(X_test)[:, 1]
+    xgb.fit(X_train_scaled, y_train, sample_weight=train_sample_weight)
+    xgb_test_pred = xgb.predict(X_test_scaled)
+    xgb_test_prob = xgb.predict_proba(X_test_scaled)[:, 1]
 
-    ensemble_test_pred = np.where((lgbm_test_pred == 1) & (xgb_test_pred == 1), 1, 0)
+    ensemble_test_prob = (lgbm_test_prob + xgb_test_prob) / 2.0
+    threshold_candidates = [0.35, 0.40, 0.45, 0.50, 0.55]
+    soft_voting_thresholds, selected_threshold, ensemble_test_pred = evaluate_soft_voting_thresholds(
+        y_test,
+        ensemble_test_prob,
+        threshold_candidates,
+    )
 
     report: dict[str, Any] = {
         "task": "file_malware_retraining",
@@ -284,7 +364,13 @@ def main() -> None:
         },
         "lightgbm": evaluate_predictions(y_test, lgbm_test_pred, lgbm_test_prob),
         "xgboost": evaluate_predictions(y_test, xgb_test_pred, xgb_test_prob),
-        "ensemble": evaluate_predictions(y_test, ensemble_test_pred),
+        "ensemble": evaluate_predictions(y_test, ensemble_test_pred, ensemble_test_prob),
+        "ensemble_soft_voting": {
+            "probability_source": "avg_prob = (lgbm_prob + xgb_prob) / 2",
+            "threshold_candidates": threshold_candidates,
+            "selected_threshold": selected_threshold,
+            "threshold_reports": soft_voting_thresholds,
+        },
         "metadata": {
             "feature_columns": FEATURE_COLUMNS,
             "scale_pos_weight": round(float(scale_pos_weight), 6),

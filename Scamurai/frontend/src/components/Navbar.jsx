@@ -20,20 +20,23 @@ export default function Navbar() {
           </span>
         </NavLink>
 
-        <nav aria-label="Primary navigation" className="nav">
-          {navigationItems.map((item) => (
-            <NavLink
-              key={item.to}
-              className={({ isActive }) =>
-                `nav-link${isActive ? " is-active" : ""}`
-              }
-              end={item.end}
-              to={item.to}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+        <div className="nav-cluster">
+          <span className="nav-status">ML + Geo + Trends</span>
+          <nav aria-label="Primary navigation" className="nav">
+            {navigationItems.map((item) => (
+              <NavLink
+                key={item.to}
+                className={({ isActive }) =>
+                  `nav-link${isActive ? " is-active" : ""}`
+                }
+                end={item.end}
+                to={item.to}
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
       </div>
     </header>
   );

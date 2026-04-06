@@ -39,7 +39,7 @@ export default function UrlPage() {
       setError(
         getApiErrorMessage(
           requestError,
-          "The URL scan failed. Please check the backend and try again."
+          "The URL scan could not be completed. Please review the input and try again."
         )
       );
     } finally {
