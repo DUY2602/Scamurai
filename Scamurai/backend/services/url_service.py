@@ -10,8 +10,27 @@ from backend.services.asset_paths import find_asset_dir
 
 MODEL_DIR = find_asset_dir(Path(__file__), "URL", "models")
 
+
+def load_xgboost_model(model_dir: Path):
+    """Load XGBoost model, preferring .ubj format with .pkl fallback."""
+    ubj_path = model_dir / "xgb_model.ubj"
+    pkl_path = model_dir / "xgb_model.pkl"
+    
+    if ubj_path.exists():
+        try:
+            from xgboost import Booster
+            return Booster(model_file=str(ubj_path))
+        except Exception as e:
+            print(f"Warning: Failed to load .ubj model, falling back to .pkl. Error: {e}")
+    
+    if pkl_path.exists():
+        return joblib.load(pkl_path)
+    
+    raise FileNotFoundError(f"No XGBoost model found at {ubj_path} or {pkl_path}")
+
+
 lgbm = joblib.load(MODEL_DIR / "lgbm_model.pkl")
-xgb = joblib.load(MODEL_DIR / "xgb_model.pkl")
+xgb = load_xgboost_model(MODEL_DIR)
 scaler = joblib.load(MODEL_DIR / "scaler.pkl")
 feature_names = joblib.load(MODEL_DIR / "feature_names.pkl")
 

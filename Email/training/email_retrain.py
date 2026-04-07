@@ -18,6 +18,7 @@ from lightgbm import LGBMClassifier
 from scipy.sparse import csr_matrix, hstack
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.pipeline import FeatureUnion
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import classification_report, confusion_matrix, precision_recall_fscore_support, roc_auc_score
 from sklearn.model_selection import StratifiedKFold
@@ -130,15 +131,17 @@ def featurize_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return output
 
 
-def fit_vectorizer_and_scaler(train_features: pd.DataFrame) -> tuple[TfidfVectorizer, StandardScaler]:
-    vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1, 2))
+def fit_vectorizer_and_scaler(train_features: pd.DataFrame) -> tuple[Any, StandardScaler]:
+    word_vectorizer = TfidfVectorizer(max_features=4000, ngram_range=(1, 2), stop_words="english")
+    char_vectorizer = TfidfVectorizer(analyzer="char_wb", ngram_range=(3, 5), max_features=3000)
+    vectorizer = FeatureUnion([("word", word_vectorizer), ("char", char_vectorizer)])
     scaler = StandardScaler()
     vectorizer.fit(train_features["full_clean_text"])
     scaler.fit(train_features[NUMERIC_FEATURES])
     return vectorizer, scaler
 
 
-def transform_features(features: pd.DataFrame, vectorizer: TfidfVectorizer, scaler: StandardScaler):
+def transform_features(features: pd.DataFrame, vectorizer: Any, scaler: StandardScaler):
     tfidf = vectorizer.transform(features["full_clean_text"])
     numeric = scaler.transform(features[NUMERIC_FEATURES])
     return hstack([tfidf, csr_matrix(numeric)]).tocsr()
@@ -459,9 +462,9 @@ def main() -> None:
         "cv_summary": cv_summary,
         "numeric_features": NUMERIC_FEATURES,
         "vectorizer": {
-            "max_features": vectorizer.max_features,
-            "ngram_range": list(vectorizer.ngram_range),
-            "vocabulary_size": len(vectorizer.vocabulary_),
+            "type": "FeatureUnion_Word_Char",
+            "word_max_features": 4000,
+            "char_max_features": 3000,
         },
         "label_classes": label_encoder.classes_.tolist(),
     }

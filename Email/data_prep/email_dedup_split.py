@@ -30,6 +30,8 @@ except Exception:  # pragma: no cover - optional dependency
 ROOT_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = ROOT_DIR / "data"
 DEFAULT_INPUT = DATA_DIR / "email_classification_dataset.csv"
+if not DEFAULT_INPUT.exists():
+    DEFAULT_INPUT = ROOT_DIR / "spamassassin_parsed.csv"
 TRAIN_OUTPUT = DATA_DIR / "email_train.csv"
 VAL_OUTPUT = DATA_DIR / "email_val.csv"
 TEST_OUTPUT = DATA_DIR / "email_test.csv"
@@ -129,7 +131,7 @@ def normalize_records(df: pd.DataFrame) -> pd.DataFrame:
                 "text": record["text"],
                 "normalized_text": normalized_text,
                 "exact_hash": sha256_text(normalized_text),
-                "label": str(row.get(label_col, "ham")).strip().lower(),
+                "label": "spam" if str(row.get(label_col, "ham")).strip().lower() in ["1", "spam", "true", "malicious"] else "ham",
                 "source": str(row.get("source", "unknown") or "unknown").strip().lower(),
             }
         )
@@ -270,6 +272,7 @@ def split_dataset(df: pd.DataFrame, random_state: int) -> tuple[pd.DataFrame, pd
 
 
 def save_split(df: pd.DataFrame, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False, encoding="utf-8")
     print(f"Saved: {path}")
 

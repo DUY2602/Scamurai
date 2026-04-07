@@ -29,6 +29,7 @@ class ModelMetadata:
         trained_at: str | None = None,
         metrics: dict[str, Any] | None = None,
         features: list[str] | None = None,
+        feature_importance: dict[str, Any] | None = None,
     ):
         self.detection_type = detection_type
         self.model_version = model_version
@@ -36,6 +37,7 @@ class ModelMetadata:
         self.trained_at = trained_at or datetime.utcnow().isoformat()
         self.metrics = metrics or {}
         self.features = features or []
+        self.feature_importance = feature_importance or {}
 
     def to_dict(self) -> dict[str, Any]:
         """Export as dict for API responses."""
@@ -46,15 +48,18 @@ class ModelMetadata:
             "detection_type": self.detection_type,
             "metrics_available": bool(self.metrics),
             "feature_count": len(self.features),
+            "feature_importance_available": bool(self.feature_importance),
         }
 
     def to_dict_full(self) -> dict[str, Any]:
-        """Export full metadata including metrics (for logging/debugging)."""
+        """Export full metadata including metrics and feature importance (for logging/debugging)."""
         result = self.to_dict()
         if self.metrics:
             result["metrics"] = self.metrics
         if self.features:
             result["features"] = self.features
+        if self.feature_importance:
+            result["feature_importance"] = self.feature_importance
         return result
 
 
@@ -129,6 +134,7 @@ class ModelMetadataRegistry:
             "xgboost_accuracy": report.get("xgboost", {}).get("accuracy"),
         }
         selected_threshold = report.get("ensemble_soft_voting", {}).get("selected_threshold")
+        feature_importance = report.get("feature_importance", {})
 
         return ModelMetadata(
             detection_type="file",
@@ -137,6 +143,7 @@ class ModelMetadataRegistry:
             trained_at=report.get("metadata", {}).get("trained_at"),
             metrics={k: v for k, v in metrics.items() if v is not None},
             features=report.get("metadata", {}).get("feature_columns", []),
+            feature_importance=feature_importance,
         )
 
     def _load_email_metadata(self) -> ModelMetadata:
@@ -183,6 +190,7 @@ class ModelMetadataRegistry:
             "xgb_accuracy": report.get("xgb", {}).get("accuracy"),
         }
         selected_threshold = report.get("ensemble_soft_voting", {}).get("selected_threshold")
+        feature_importance = report.get("feature_importance", {})
 
         return ModelMetadata(
             detection_type="url",
@@ -191,6 +199,7 @@ class ModelMetadataRegistry:
             trained_at=report.get("metadata", {}).get("trained_at"),
             metrics={k: v for k, v in metrics.items() if v is not None},
             features=report.get("metadata", {}).get("feature_columns", []),
+            feature_importance=feature_importance,
         )
 
     def _load_all_metadata(self) -> None:

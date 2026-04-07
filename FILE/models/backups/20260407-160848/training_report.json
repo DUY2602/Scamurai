@@ -1,0 +1,456 @@
+{
+  "task": "file_malware_retraining",
+  "data_path": "C:\\COS30018\\spam\\Scamurai\\FILE\\data\\malware_data_final.csv",
+  "models_dir": "C:\\COS30018\\spam\\Scamurai\\FILE\\models",
+  "backup_dir": "C:\\COS30018\\spam\\Scamurai\\FILE\\models\\backups\\20260407-160706",
+  "dataset": {
+    "rows": 600,
+    "train_rows": 486,
+    "test_rows": 120,
+    "hardcase_rows": 6,
+    "label_distribution": {
+      "benign": 300,
+      "malware": 300
+    }
+  },
+  "lightgbm": {
+    "accuracy": 1.0,
+    "f1": 1.0,
+    "confusion_matrix": [
+      [
+        60,
+        0
+      ],
+      [
+        0,
+        60
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "1": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 120.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 120.0
+      }
+    },
+    "roc_auc": 1.0
+  },
+  "xgboost": {
+    "accuracy": 1.0,
+    "f1": 1.0,
+    "confusion_matrix": [
+      [
+        60,
+        0
+      ],
+      [
+        0,
+        60
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "1": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 120.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 120.0
+      }
+    },
+    "roc_auc": 1.0
+  },
+  "ensemble": {
+    "accuracy": 1.0,
+    "f1": 1.0,
+    "confusion_matrix": [
+      [
+        60,
+        0
+      ],
+      [
+        0,
+        60
+      ]
+    ],
+    "classification_report": {
+      "0": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "1": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 60.0
+      },
+      "accuracy": 1.0,
+      "macro avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 120.0
+      },
+      "weighted avg": {
+        "precision": 1.0,
+        "recall": 1.0,
+        "f1-score": 1.0,
+        "support": 120.0
+      }
+    },
+    "roc_auc": 1.0
+  },
+  "ensemble_soft_voting": {
+    "probability_source": "avg_prob = (lgbm_prob + xgb_prob) / 2",
+    "threshold_candidates": [
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55
+    ],
+    "selected_threshold": 0.35,
+    "threshold_reports": {
+      "0.35": {
+        "threshold": 0.35,
+        "confusion_matrix": [
+          [
+            60,
+            0
+          ],
+          [
+            0,
+            60
+          ]
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "1": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "accuracy": 1.0,
+          "macro avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          },
+          "weighted avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          }
+        },
+        "roc_auc": 1.0
+      },
+      "0.40": {
+        "threshold": 0.4,
+        "confusion_matrix": [
+          [
+            60,
+            0
+          ],
+          [
+            0,
+            60
+          ]
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "1": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "accuracy": 1.0,
+          "macro avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          },
+          "weighted avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          }
+        },
+        "roc_auc": 1.0
+      },
+      "0.45": {
+        "threshold": 0.45,
+        "confusion_matrix": [
+          [
+            60,
+            0
+          ],
+          [
+            0,
+            60
+          ]
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "1": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "accuracy": 1.0,
+          "macro avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          },
+          "weighted avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          }
+        },
+        "roc_auc": 1.0
+      },
+      "0.50": {
+        "threshold": 0.5,
+        "confusion_matrix": [
+          [
+            60,
+            0
+          ],
+          [
+            0,
+            60
+          ]
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "1": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "accuracy": 1.0,
+          "macro avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          },
+          "weighted avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          }
+        },
+        "roc_auc": 1.0
+      },
+      "0.55": {
+        "threshold": 0.55,
+        "confusion_matrix": [
+          [
+            60,
+            0
+          ],
+          [
+            0,
+            60
+          ]
+        ],
+        "classification_report": {
+          "0": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "1": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 60.0
+          },
+          "accuracy": 1.0,
+          "macro avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          },
+          "weighted avg": {
+            "precision": 1.0,
+            "recall": 1.0,
+            "f1-score": 1.0,
+            "support": 120.0
+          }
+        },
+        "roc_auc": 1.0
+      }
+    }
+  },
+  "feature_importance": {
+    "lgbm": {
+      "Sections": 2,
+      "AvgEntropy": 252,
+      "MaxEntropy": 76,
+      "SuspiciousSections": 15,
+      "DLLs": 48,
+      "Imports": 8,
+      "HasSensitiveAPI": 0,
+      "ImageBase": 0,
+      "SizeOfImage": 90,
+      "HasVersionInfo": 212
+    },
+    "xgboost": {
+      "Sections": 0.0255146324634552,
+      "AvgEntropy": 0.31682780385017395,
+      "MaxEntropy": 0.1239876002073288,
+      "SuspiciousSections": 0.09259393811225891,
+      "DLLs": 0.0022109486162662506,
+      "Imports": 0.0005600074655376375,
+      "HasSensitiveAPI": 0.0,
+      "ImageBase": 0.0,
+      "SizeOfImage": 0.06353621184825897,
+      "HasVersionInfo": 0.3747689425945282
+    },
+    "ensemble_avg": {
+      "Sections": 1.012757,
+      "AvgEntropy": 126.158414,
+      "MaxEntropy": 38.061994,
+      "SuspiciousSections": 7.546297,
+      "DLLs": 24.001105,
+      "Imports": 4.00028,
+      "HasSensitiveAPI": 0.0,
+      "ImageBase": 0.0,
+      "SizeOfImage": 45.031768,
+      "HasVersionInfo": 106.187384
+    },
+    "ranked": [
+      [
+        "AvgEntropy",
+        126.158414
+      ],
+      [
+        "HasVersionInfo",
+        106.187384
+      ],
+      [
+        "SizeOfImage",
+        45.031768
+      ],
+      [
+        "MaxEntropy",
+        38.061994
+      ],
+      [
+        "DLLs",
+        24.001105
+      ],
+      [
+        "SuspiciousSections",
+        7.546297
+      ],
+      [
+        "Imports",
+        4.00028
+      ],
+      [
+        "Sections",
+        1.012757
+      ],
+      [
+        "HasSensitiveAPI",
+        0.0
+      ],
+      [
+        "ImageBase",
+        0.0
+      ]
+    ]
+  },
+  "metadata": {
+    "feature_columns": [
+      "Sections",
+      "AvgEntropy",
+      "MaxEntropy",
+      "SuspiciousSections",
+      "DLLs",
+      "Imports",
+      "HasSensitiveAPI",
+      "ImageBase",
+      "SizeOfImage",
+      "HasVersionInfo"
+    ],
+    "scale_pos_weight": 1.016598,
+    "hardcase_scale": 1.0
+  }
+}

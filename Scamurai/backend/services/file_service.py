@@ -13,8 +13,27 @@ from backend.services.asset_paths import find_asset_dir
 
 MODEL_DIR = find_asset_dir(Path(__file__), "FILE", "models")
 
+
+def load_xgboost_model(model_dir: Path):
+    """Load XGBoost model, preferring .ubj format with .pkl fallback."""
+    ubj_path = model_dir / "xgboost_malware_model.ubj"
+    pkl_path = model_dir / "xgboost_malware_model.pkl"
+    
+    if ubj_path.exists():
+        try:
+            from xgboost import Booster
+            return Booster(model_file=str(ubj_path))
+        except Exception as e:
+            print(f"Warning: Failed to load .ubj model, falling back to .pkl. Error: {e}")
+    
+    if pkl_path.exists():
+        return joblib.load(pkl_path)
+    
+    raise FileNotFoundError(f"No XGBoost model found at {ubj_path} or {pkl_path}")
+
+
 lgbm = joblib.load(MODEL_DIR / "lightgbm_malware_model.pkl")
-xgb = joblib.load(MODEL_DIR / "xgboost_malware_model.pkl")
+xgb = load_xgboost_model(MODEL_DIR)
 scaler = joblib.load(MODEL_DIR / "feature_scaler.pkl")
 
 # Load thresholds from centralized registry
@@ -129,7 +148,9 @@ def extract_features(raw: bytes, filename: str) -> dict:
         has_version_info = 1 if hasattr(pe, "VS_FIXEDFILEINFO") else 0
         image_base = int(pe.OPTIONAL_HEADER.ImageBase)
         size_of_image = int(pe.OPTIONAL_HEADER.SizeOfImage)
-        return {
+        
+        # v1 features
+        features = {
             "Sections": sections,
             "AvgEntropy": round(avg_entropy, 4),
             "MaxEntropy": round(max_entropy, 4),
@@ -141,6 +162,39 @@ def extract_features(raw: bytes, filename: str) -> dict:
             "SizeOfImage": size_of_image,
             "HasVersionInfo": has_version_info,
         }
+        
+        # v2 features
+        # is_packed: entropy > 7.5 + suspicious sections
+        is_packed_v = 1 if (max_entropy > 7.5 or avg_entropy > 7.0) and suspicious_sections > 0 else 0
+        features["is_packed"] = is_packed_v
+        
+        # import_category_score: suspicious dll count / total dlls (normalized)
+        import_category_v = round(min(1.0, dlls / 100.0 if dlls else 0.0), 4)
+        features["import_category_score"] = import_category_v
+        
+        # has_tls: check for .tls section
+        has_tls_v = 1 if any(s.Name.startswith(b'.tls') for s in pe.sections) else 0
+        features["has_tls"] = has_tls_v
+        
+        # export_table_size: count exports (DLL injection risk)
+        export_size_v = 0
+        if hasattr(pe, "DIRECTORY_ENTRY_EXPORT"):
+            export_size_v = len(pe.DIRECTORY_ENTRY_EXPORT.symbols) if pe.DIRECTORY_ENTRY_EXPORT.symbols else 0
+        features["export_table_size"] = export_size_v
+        
+        # resource_entropy: entropy of .rsrc section
+        rsrc_entropy_v = 0.0
+        for section in pe.sections:
+            if section.Name.startswith(b'.rsrc'):
+                rsrc_entropy_v = round(section.get_entropy(), 4)
+                break
+        features["resource_entropy"] = rsrc_entropy_v
+        
+        # api_category_score: range based on import count / dll count
+        api_score_v = round(min(1.0, (imports / 100.0) if imports else 0.0), 4)
+        features["api_category_score"] = api_score_v
+        
+        return features
     finally:
         if "pe" in locals():
             pe.close()

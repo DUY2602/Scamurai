@@ -28,6 +28,7 @@ from URL.utils.preprocess import FEATURE_COLUMNS, extract_features
 ARTIFACT_FILES = [
     "lgbm_model.pkl",
     "xgb_model.pkl",
+    "xgb_model.ubj",  # XGBoost universal binary format
     "feature_names.pkl",
     "feature_names_xgb.pkl",
     "scaler.pkl",
@@ -420,6 +421,17 @@ def main() -> None:
         threshold_candidates,
     )
 
+    # Extract feature importance from both models
+    lgbm_importance = dict(zip(FEATURE_COLUMNS, lgbm.feature_importances_.tolist()))
+    xgb_importance_array = xgb.feature_importances_
+    xgb_importance = dict(zip(FEATURE_COLUMNS, xgb_importance_array.tolist()))
+
+    # Compute ensemble feature importance (average)
+    ensemble_importance = {
+        feature: round((lgbm_importance[feature] + xgb_importance[feature]) / 2.0, 6)
+        for feature in FEATURE_COLUMNS
+    }
+
     report: dict[str, Any] = {
         "task": "url_retraining",
         "data_path": str(args.data_path),
@@ -446,6 +458,12 @@ def main() -> None:
             "selected_threshold": selected_threshold,
             "threshold_reports": soft_voting_thresholds,
         },
+        "feature_importance": {
+            "lgbm": lgbm_importance,
+            "xgboost": xgb_importance,
+            "ensemble_avg": ensemble_importance,
+            "ranked": sorted(ensemble_importance.items(), key=lambda x: x[1], reverse=True),
+        },
         "metadata": {
             "feature_columns": FEATURE_COLUMNS,
             "scale_pos_weight": round(float(scale_pos_weight), 6),
@@ -456,6 +474,8 @@ def main() -> None:
 
     joblib.dump(lgbm, models_dir / "lgbm_model.pkl")
     joblib.dump(xgb, models_dir / "xgb_model.pkl")
+    # Save XGBoost in universal binary format (preferred)
+    xgb.get_booster().save_model(str(models_dir / "xgb_model.ubj"))
     joblib.dump(FEATURE_COLUMNS, models_dir / "feature_names.pkl")
     joblib.dump(FEATURE_COLUMNS, models_dir / "feature_names_xgb.pkl")
     joblib.dump(scaler, models_dir / "scaler.pkl")

@@ -51,7 +51,11 @@ def _load_artifacts() -> dict[str, Any]:
     scaler = joblib.load(SCALER_PATH)
     label_encoder = joblib.load(LABEL_ENCODER_PATH)
     metadata = _load_optional_json(BEST_MODEL_META_PATH)
-    inferred_feature_count = len(getattr(vectorizer, "vocabulary_", {})) + int(getattr(scaler, "n_features_in_", 0) or 0)
+    if hasattr(vectorizer, "transformer_list"):
+        inferred_feature_count = None
+    else:
+        inferred_feature_count = len(getattr(vectorizer, "vocabulary_", {})) + int(getattr(scaler, "n_features_in_", 0) or 0)
+    
     if not BEST_MODEL_PATH.is_file():
         raise FileNotFoundError(
             "Email runtime requires models/best_model.pkl. "
@@ -60,7 +64,7 @@ def _load_artifacts() -> dict[str, Any]:
 
     model = joblib.load(BEST_MODEL_PATH)
     model_feature_count = getattr(model, "n_features_in_", None)
-    if model_feature_count is not None and inferred_feature_count and int(model_feature_count) != inferred_feature_count:
+    if model_feature_count is not None and inferred_feature_count is not None and int(model_feature_count) != inferred_feature_count:
         raise RuntimeError(
             f"best_model expects {int(model_feature_count)} features, "
             f"but vectorizer+scaler provide {inferred_feature_count}. "

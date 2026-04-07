@@ -19,7 +19,22 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from xgboost import XGBClassifier
 
+# Try to import v2 feature extractors
+try:
+    from feature_engineering_v2 import (
+        is_packed,
+        import_category_score,
+        has_tls,
+        export_table_size,
+        resource_entropy,
+        api_category_score,
+    )
+    V2_AVAILABLE = True
+except ImportError:
+    V2_AVAILABLE = False
+
 FEATURE_COLUMNS = [
+    # v1 baseline features (10)
     "Sections",
     "AvgEntropy",
     "MaxEntropy",
@@ -30,11 +45,19 @@ FEATURE_COLUMNS = [
     "ImageBase",
     "SizeOfImage",
     "HasVersionInfo",
+    # v2 new features (6)
+    "is_packed",
+    "import_category_score",
+    "has_tls",
+    "export_table_size",
+    "resource_entropy",
+    "api_category_score",
 ]
 
 ARTIFACT_FILES = [
     "lightgbm_malware_model.pkl",
     "xgboost_malware_model.pkl",
+    "xgboost_malware_model.ubj",  # XGBoost universal binary format
     "feature_scaler.pkl",
     "training_report.json",
 ]
@@ -220,6 +243,32 @@ def extract_training_features_from_pe(file_path: Path) -> dict[str, Any]:
             "SizeOfImage": int(pe.OPTIONAL_HEADER.SizeOfImage),
             "HasVersionInfo": 1 if hasattr(pe, "VS_FIXEDFILEINFO") else 0,
         }
+        
+        # Extract v2 features if available
+        if V2_AVAILABLE:
+            try:
+                features["is_packed"] = int(is_packed(pe))
+                features["import_category_score"] = round(float(import_category_score(pe)), 4)
+                features["has_tls"] = int(has_tls(pe))
+                features["export_table_size"] = int(export_table_size(pe))
+                features["resource_entropy"] = round(float(resource_entropy(pe)), 4)
+                features["api_category_score"] = round(float(api_category_score(pe)), 4)
+            except Exception:
+                # If v2 extraction fails, fill with defaults
+                features["is_packed"] = 0
+                features["import_category_score"] = 0.0
+                features["has_tls"] = 0
+                features["export_table_size"] = 0
+                features["resource_entropy"] = 0.0
+                features["api_category_score"] = 0.0
+        else:
+            # If v2 not available, fill with zeros
+            features["is_packed"] = 0
+            features["import_category_score"] = 0.0
+            features["has_tls"] = 0
+            features["export_table_size"] = 0
+            features["resource_entropy"] = 0.0
+            features["api_category_score"] = 0.0
     finally:
         pe.close()
 
@@ -347,6 +396,17 @@ def main() -> None:
         threshold_candidates,
     )
 
+    # Extract feature importance from both models
+    lgbm_importance = dict(zip(FEATURE_COLUMNS, lgbm.feature_importances_.tolist()))
+    xgb_importance_array = xgb.feature_importances_
+    xgb_importance = dict(zip(FEATURE_COLUMNS, xgb_importance_array.tolist()))
+
+    # Compute ensemble feature importance (average)
+    ensemble_importance = {
+        feature: round((lgbm_importance[feature] + xgb_importance[feature]) / 2.0, 6)
+        for feature in FEATURE_COLUMNS
+    }
+
     report: dict[str, Any] = {
         "task": "file_malware_retraining",
         "data_path": str(args.data_path),
@@ -371,6 +431,12 @@ def main() -> None:
             "selected_threshold": selected_threshold,
             "threshold_reports": soft_voting_thresholds,
         },
+        "feature_importance": {
+            "lgbm": lgbm_importance,
+            "xgboost": xgb_importance,
+            "ensemble_avg": ensemble_importance,
+            "ranked": sorted(ensemble_importance.items(), key=lambda x: x[1], reverse=True),
+        },
         "metadata": {
             "feature_columns": FEATURE_COLUMNS,
             "scale_pos_weight": round(float(scale_pos_weight), 6),
@@ -380,6 +446,8 @@ def main() -> None:
 
     joblib.dump(lgbm, models_dir / "lightgbm_malware_model.pkl")
     joblib.dump(xgb, models_dir / "xgboost_malware_model.pkl")
+    # Save XGBoost in universal binary format (preferred)
+    xgb.get_booster().save_model(str(models_dir / "xgboost_malware_model.ubj"))
     joblib.dump(scaler, models_dir / "feature_scaler.pkl")
     legacy_kmeans_path = models_dir / "kmeans_malware_model.pkl"
     if legacy_kmeans_path.exists():

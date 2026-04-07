@@ -1,0 +1,51 @@
+{
+  "cv_summary": {
+    "lightgbm": {
+      "f1_mean": 0.9660749969205022,
+      "f1_std": 0.012064993526285076,
+      "precision_mean": 0.9765552851032755,
+      "precision_std": 0.006498507291864938,
+      "recall_mean": 0.9565868860357858,
+      "recall_std": 0.01814644674758443
+    },
+    "linear_svc": {
+      "f1_mean": 0.96114055140138,
+      "f1_std": 0.011170793413016635,
+      "precision_mean": 0.975167040917988,
+      "precision_std": 0.009208019583560751,
+      "recall_mean": 0.9486992448534733,
+      "recall_std": 0.017181782424887913
+    },
+    "logistic_regression": {
+      "f1_mean": 0.9437637363814982,
+      "f1_std": 0.011024029508227624,
+      "precision_mean": 0.9386774290913543,
+      "precision_std": 0.013798182128471479,
+      "recall_mean": 0.9494809025147705,
+      "recall_std": 0.013337232475108197
+    }
+  },
+  "hardcase_macro_f1": 0.0,
+  "hardcase_save_threshold": 0.6,
+  "label_classes": [
+    "ham",
+    "spam"
+  ],
+  "numeric_features": [
+    "num_urls",
+    "email_length",
+    "num_exclamation",
+    "upper_case_ratio",
+    "url_to_text_ratio",
+    "has_generic_greeting",
+    "is_free_email"
+  ],
+  "selected_model": "lightgbm",
+  "selected_threshold": 0.35,
+  "validation_macro_f1": 0.9650987486808382,
+  "vectorizer": {
+    "char_max_features": 3000,
+    "type": "FeatureUnion_Word_Char",
+    "word_max_features": 4000
+  }
+}

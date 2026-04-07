@@ -1,0 +1,291 @@
+{
+  "model": "lightgbm",
+  "threshold": 0.35,
+  "metadata": {
+    "cv_summary": {
+      "lightgbm": {
+        "f1_mean": 0.9660749969205022,
+        "f1_std": 0.012064993526285076,
+        "precision_mean": 0.9765552851032755,
+        "precision_std": 0.006498507291864938,
+        "recall_mean": 0.9565868860357858,
+        "recall_std": 0.01814644674758443
+      },
+      "linear_svc": {
+        "f1_mean": 0.96114055140138,
+        "f1_std": 0.011170793413016635,
+        "precision_mean": 0.975167040917988,
+        "precision_std": 0.009208019583560751,
+        "recall_mean": 0.9486992448534733,
+        "recall_std": 0.017181782424887913
+      },
+      "logistic_regression": {
+        "f1_mean": 0.9437637363814982,
+        "f1_std": 0.011024029508227624,
+        "precision_mean": 0.9386774290913543,
+        "precision_std": 0.013798182128471479,
+        "recall_mean": 0.9494809025147705,
+        "recall_std": 0.013337232475108197
+      }
+    },
+    "hardcase_macro_f1": 0.0,
+    "hardcase_save_threshold": 0.6,
+    "label_classes": [
+      "ham",
+      "spam"
+    ],
+    "numeric_features": [
+      "num_urls",
+      "email_length",
+      "num_exclamation",
+      "upper_case_ratio",
+      "url_to_text_ratio",
+      "has_generic_greeting",
+      "is_free_email"
+    ],
+    "selected_model": "lightgbm",
+    "selected_threshold": 0.35,
+    "validation_macro_f1": 0.9650987486808382,
+    "vectorizer": {
+      "char_max_features": 3000,
+      "type": "FeatureUnion_Word_Char",
+      "word_max_features": 4000
+    }
+  },
+  "test_metrics": {
+    "threshold": 0.35,
+    "total_samples": 464,
+    "ham_samples": 395,
+    "spam_samples": 69,
+    "accuracy": 0.9806034482758621,
+    "roc_auc": 0.9970280682443589,
+    "precision_spam": 0.9166666666666666,
+    "recall_spam": 0.9565217391304348,
+    "f1_spam": 0.9361702127659575,
+    "macro_f1": 0.9623671902457487,
+    "true_positives": 66,
+    "true_negatives": 389,
+    "false_positives": 6,
+    "false_negatives": 3,
+    "false_positive_rate": 0.015189873417721518,
+    "false_negative_rate": 0.043478260869565216,
+    "confusion_matrix": [
+      [
+        389,
+        6
+      ],
+      [
+        3,
+        66
+      ]
+    ],
+    "classification_report": {
+      "ham": {
+        "precision": 0.9923469387755102,
+        "recall": 0.9848101265822785,
+        "f1-score": 0.98856416772554,
+        "support": 395.0
+      },
+      "spam": {
+        "precision": 0.9166666666666666,
+        "recall": 0.9565217391304348,
+        "f1-score": 0.9361702127659575,
+        "support": 69.0
+      },
+      "accuracy": 0.9806034482758621,
+      "macro avg": {
+        "precision": 0.9545068027210883,
+        "recall": 0.9706659328563567,
+        "f1-score": 0.9623671902457487,
+        "support": 464.0
+      },
+      "weighted avg": {
+        "precision": 0.981092760380014,
+        "recall": 0.9806034482758621,
+        "f1-score": 0.9807728252854296,
+        "support": 464.0
+      }
+    }
+  },
+  "threshold_sweep": [
+    {
+      "threshold": 0.2,
+      "accuracy": 0.9806034482758621,
+      "precision_spam": 0.9166666666666666,
+      "recall_spam": 0.9565217391304348,
+      "f1_spam": 0.9361702127659575,
+      "macro_f1": 0.9623671902457487,
+      "false_positive_rate": 0.015189873417721518,
+      "false_negative_rate": 0.043478260869565216,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.25,
+      "accuracy": 0.9806034482758621,
+      "precision_spam": 0.9166666666666666,
+      "recall_spam": 0.9565217391304348,
+      "f1_spam": 0.9361702127659575,
+      "macro_f1": 0.9623671902457487,
+      "false_positive_rate": 0.015189873417721518,
+      "false_negative_rate": 0.043478260869565216,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.3,
+      "accuracy": 0.9806034482758621,
+      "precision_spam": 0.9166666666666666,
+      "recall_spam": 0.9565217391304348,
+      "f1_spam": 0.9361702127659575,
+      "macro_f1": 0.9623671902457487,
+      "false_positive_rate": 0.015189873417721518,
+      "false_negative_rate": 0.043478260869565216,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.35,
+      "accuracy": 0.9806034482758621,
+      "precision_spam": 0.9166666666666666,
+      "recall_spam": 0.9565217391304348,
+      "f1_spam": 0.9361702127659575,
+      "macro_f1": 0.9623671902457487,
+      "false_positive_rate": 0.015189873417721518,
+      "false_negative_rate": 0.043478260869565216,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.4,
+      "accuracy": 0.9827586206896551,
+      "precision_spam": 0.9295774647887324,
+      "recall_spam": 0.9565217391304348,
+      "f1_spam": 0.9428571428571428,
+      "macro_f1": 0.9663524292965917,
+      "false_positive_rate": 0.012658227848101266,
+      "false_negative_rate": 0.043478260869565216,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.45,
+      "accuracy": 0.9827586206896551,
+      "precision_spam": 0.9295774647887324,
+      "recall_spam": 0.9565217391304348,
+      "f1_spam": 0.9428571428571428,
+      "macro_f1": 0.9663524292965917,
+      "false_positive_rate": 0.012658227848101266,
+      "false_negative_rate": 0.043478260869565216,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.5,
+      "accuracy": 0.9827586206896551,
+      "precision_spam": 0.9295774647887324,
+      "recall_spam": 0.9565217391304348,
+      "f1_spam": 0.9428571428571428,
+      "macro_f1": 0.9663524292965917,
+      "false_positive_rate": 0.012658227848101266,
+      "false_negative_rate": 0.043478260869565216,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.55,
+      "accuracy": 0.9806034482758621,
+      "precision_spam": 0.9285714285714286,
+      "recall_spam": 0.9420289855072463,
+      "f1_spam": 0.935251798561151,
+      "macro_f1": 0.9619224772273436,
+      "false_positive_rate": 0.012658227848101266,
+      "false_negative_rate": 0.057971014492753624,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.6,
+      "accuracy": 0.978448275862069,
+      "precision_spam": 0.927536231884058,
+      "recall_spam": 0.927536231884058,
+      "f1_spam": 0.927536231884058,
+      "macro_f1": 0.9574390020179784,
+      "false_positive_rate": 0.012658227848101266,
+      "false_negative_rate": 0.07246376811594203,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.65,
+      "accuracy": 0.978448275862069,
+      "precision_spam": 0.927536231884058,
+      "recall_spam": 0.927536231884058,
+      "f1_spam": 0.927536231884058,
+      "macro_f1": 0.9574390020179784,
+      "false_positive_rate": 0.012658227848101266,
+      "false_negative_rate": 0.07246376811594203,
+      "roc_auc": 0.9970280682443589
+    },
+    {
+      "threshold": 0.7,
+      "accuracy": 0.978448275862069,
+      "precision_spam": 0.927536231884058,
+      "recall_spam": 0.927536231884058,
+      "f1_spam": 0.927536231884058,
+      "macro_f1": 0.9574390020179784,
+      "false_positive_rate": 0.012658227848101266,
+      "false_negative_rate": 0.07246376811594203,
+      "roc_auc": 0.9970280682443589
+    }
+  ],
+  "sanity_checks": [
+    {
+      "subject": "Team sync tomorrow at 10am",
+      "expected": "ham",
+      "predicted": "ham",
+      "spam_probability": 2.2745666991189788e-05,
+      "correct": true
+    },
+    {
+      "subject": "Your package has shipped",
+      "expected": "ham",
+      "predicted": "ham",
+      "spam_probability": 0.07893946583507586,
+      "correct": true
+    },
+    {
+      "subject": "Invoice for last month",
+      "expected": "ham",
+      "predicted": "ham",
+      "spam_probability": 0.0004031560834793112,
+      "correct": true
+    },
+    {
+      "subject": "CONGRATULATIONS!! You have WON $1,000,000",
+      "expected": "spam",
+      "predicted": "spam",
+      "spam_probability": 0.9999995670185485,
+      "correct": true
+    },
+    {
+      "subject": "Cheap Viagra -- special offer just for you",
+      "expected": "spam",
+      "predicted": "spam",
+      "spam_probability": 0.9479572260320506,
+      "correct": true
+    },
+    {
+      "subject": "Make $5000 a day working from home!!!",
+      "expected": "spam",
+      "predicted": "spam",
+      "spam_probability": 0.8150051303895364,
+      "correct": true
+    },
+    {
+      "subject": "Your bank account has been suspended",
+      "expected": "spam",
+      "predicted": "spam",
+      "spam_probability": 0.7471127770757718,
+      "correct": true
+    },
+    {
+      "subject": "Lunch tomorrow?",
+      "expected": "ham",
+      "predicted": "ham",
+      "spam_probability": 0.07495959523977534,
+      "correct": true
+    }
+  ]
+}
