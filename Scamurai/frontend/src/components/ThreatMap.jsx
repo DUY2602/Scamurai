@@ -1,20 +1,55 @@
 import { useEffect, useMemo, useState } from "react";
-import { GeoJSON, MapContainer, TileLayer } from "react-leaflet";
+import { GeoJSON, MapContainer, TileLayer, useMap } from "react-leaflet";
+
+const DEFAULT_MAP_CENTER = [20, 0];
+const DEFAULT_MAP_ZOOM = 2;
 
 function getThreatRateColor(threatRate, totalScans) {
   if (!totalScans) {
     return "#dbe4ee";
   }
 
-  if (threatRate >= 0.6) {
+  if (threatRate >= 0.4) {
     return "#dc2626";
   }
 
-  if (threatRate >= 0.3) {
+  if (threatRate >= 0.2) {
     return "#f59e0b";
   }
 
   return "#16a34a";
+}
+
+function getMapTooltipLabels(activeType) {
+  if (activeType === "all") {
+    return {
+      scansLabel: "scans",
+      threatsLabel: "threats",
+      emptyLabel: "No scans in current filter",
+      rateLabel: "threat rate",
+    };
+  }
+
+  return {
+    scansLabel: `${activeType} scans`,
+    threatsLabel: `${activeType} threats`,
+    emptyLabel: `No ${activeType} scans in current filter`,
+    rateLabel: `${activeType} threat rate`,
+  };
+}
+
+function MapResetButton({ compact = false }) {
+  const map = useMap();
+
+  return (
+    <button
+      className={`map-reset-button${compact ? " map-reset-button--compact" : ""}`}
+      onClick={() => map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM)}
+      type="button"
+    >
+      Reset view
+    </button>
+  );
 }
 
 export default function ThreatMap({
@@ -23,6 +58,7 @@ export default function ThreatMap({
   compact = false,
 }) {
   const [worldGeoJson, setWorldGeoJson] = useState(null);
+  const tooltipLabels = useMemo(() => getMapTooltipLabels(activeType), [activeType]);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,13 +133,14 @@ export default function ThreatMap({
     <div className={`map-shell map-shell--leaflet${compact ? " map-shell--compact" : ""}`}>
       <MapContainer
         attributionControl={false}
-        center={[20, 0]}
+        center={DEFAULT_MAP_CENTER}
         className="map-shell__leaflet"
         preferCanvas
         scrollWheelZoom
-        zoom={2}
+        zoom={DEFAULT_MAP_ZOOM}
         zoomControl={!compact}
       >
+        <MapResetButton compact={compact} />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -111,6 +148,7 @@ export default function ThreatMap({
 
         {worldGeoJson ? (
           <GeoJSON
+            key={`threat-map-${activeType}`}
             data={worldGeoJson}
             onEachFeature={(feature, layer) => {
               const countryCode = String(
@@ -124,15 +162,15 @@ export default function ThreatMap({
                 ? `
                   <div class="map-popup">
                     <strong>${countryName}</strong>
-                    <span>${metrics.totalScans} scans</span>
-                    <span>${metrics.threatCount} threats</span>
-                    <span>${(metrics.threatRate * 100).toFixed(1)}% threat rate</span>
+                    <span>${metrics.totalScans} ${tooltipLabels.scansLabel}</span>
+                    <span>${metrics.threatCount} ${tooltipLabels.threatsLabel}</span>
+                    <span>${(metrics.threatRate * 100).toFixed(1)}% ${tooltipLabels.rateLabel}</span>
                   </div>
                 `
                 : `
                   <div class="map-popup">
                     <strong>${countryName}</strong>
-                    <span>No scans in current filter</span>
+                    <span>${tooltipLabels.emptyLabel}</span>
                   </div>
                 `;
 

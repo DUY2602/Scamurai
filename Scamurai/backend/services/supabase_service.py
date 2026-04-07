@@ -2,20 +2,36 @@ import logging
 import math
 import os
 import json
+import calendar
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
+from urllib.error import HTTPError, URLError
 
 logger = logging.getLogger(__name__)
+DEFAULT_DASHBOARD_TREND_ANCHOR = "2026-04-13T00:00:00+00:00"
+
+
+def _getenv_first(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
 
 
 def _supabase_config() -> dict | None:
-    url = os.getenv("SUPABASE_URL", "").strip()
-    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "").strip() or os.getenv(
-        "SUPABASE_ANON_KEY", ""
-    ).strip()
-    table = os.getenv("SUPABASE_TABLE", "detection_results").strip() or "detection_results"
+    url = _getenv_first("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "VITE_SUPABASE_URL")
+    key = _getenv_first(
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "VITE_SUPABASE_ANON_KEY",
+    )
+    table = _getenv_first("SUPABASE_TABLE") or "detection_results"
 
     if not url or not key:
         return None
@@ -31,6 +47,52 @@ def _supabase_config() -> dict | None:
 
 def is_supabase_enabled() -> bool:
     return _supabase_config() is not None
+
+
+def get_supabase_status() -> dict:
+    url = _getenv_first("SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "VITE_SUPABASE_URL")
+    key = _getenv_first(
+        "SUPABASE_SERVICE_ROLE_KEY",
+        "SUPABASE_KEY",
+        "SUPABASE_SECRET_KEY",
+        "SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "VITE_SUPABASE_ANON_KEY",
+    )
+    key_name = next(
+        (
+            name
+            for name in (
+                "SUPABASE_SERVICE_ROLE_KEY",
+                "SUPABASE_KEY",
+                "SUPABASE_SECRET_KEY",
+                "SUPABASE_ANON_KEY",
+                "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+                "VITE_SUPABASE_ANON_KEY",
+            )
+            if os.getenv(name, "").strip()
+        ),
+        None,
+    )
+    return {
+        "enabled": bool(url and key),
+        "has_url": bool(url),
+        "has_key": bool(key),
+        "key_env": key_name,
+        "table": _getenv_first("SUPABASE_TABLE") or "detection_results",
+        "url_host": url.replace("https://", "").replace("http://", "").split("/", 1)[0] if url else None,
+        "key_kind": (
+            "publishable"
+            if key.startswith("sb_publishable_")
+            else "secret"
+            if key.startswith("sb_secret_")
+            else "legacy-jwt"
+            if key.startswith("eyJ")
+            else "unknown"
+            if key
+            else None
+        ),
+    }
 
 
 def _headers(config: dict, *, prefer: str | None = None) -> dict:
@@ -77,6 +139,7 @@ def build_detection_payload(
 def insert_detection_result(payload: dict) -> bool:
     config = _supabase_config()
     if not config:
+        logger.warning("Supabase insert skipped: missing required env vars.")
         return False
 
     try:
@@ -89,6 +152,18 @@ def insert_detection_result(payload: dict) -> bool:
         with urlopen(request, timeout=config["timeout"]):
             pass
         return True
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="ignore")
+        logger.warning(
+            "Supabase insert failed with HTTP %s for table %s: %s",
+            exc.code,
+            config["table"],
+            error_body[:300] or exc.reason,
+        )
+        return False
+    except URLError as exc:
+        logger.warning("Supabase insert failed due to network error: %s", exc.reason)
+        return False
     except Exception as exc:
         logger.warning("Supabase insert failed: %s", exc)
         return False
@@ -97,6 +172,7 @@ def insert_detection_result(payload: dict) -> bool:
 def fetch_detection_rows() -> list[dict]:
     config = _supabase_config()
     if not config:
+        logger.warning("Supabase read skipped: missing required env vars.")
         return []
 
     rows: list[dict] = []
@@ -147,6 +223,18 @@ def fetch_detection_rows() -> list[dict]:
                 break
 
             offset += page_size
+    except HTTPError as exc:
+        error_body = exc.read().decode("utf-8", errors="ignore")
+        logger.warning(
+            "Supabase read failed with HTTP %s for table %s: %s",
+            exc.code,
+            config["table"],
+            error_body[:300] or exc.reason,
+        )
+        return []
+    except URLError as exc:
+        logger.warning("Supabase read failed due to network error: %s", exc.reason)
+        return []
     except Exception as exc:
         logger.warning("Supabase read failed: %s", exc)
         return []
@@ -184,6 +272,38 @@ def _parse_timestamp(value) -> datetime | None:
 
 def _normalize_dashboard_range(range_name: str | None) -> int:
     return 30 if str(range_name or "").lower() == "month" else 7
+
+
+def _resolve_trend_anchor_timestamp() -> datetime:
+    configured_value = (
+        os.getenv("DASHBOARD_TREND_ANCHOR", "").strip()
+        or DEFAULT_DASHBOARD_TREND_ANCHOR
+    )
+    return _parse_timestamp(configured_value) or datetime(2026, 4, 13, tzinfo=timezone.utc)
+
+
+def _shift_month(date_value, months: int):
+    total_months = (date_value.year * 12 + (date_value.month - 1)) + months
+    year = total_months // 12
+    month = total_months % 12 + 1
+    day = min(date_value.day, calendar.monthrange(year, month)[1])
+    return date_value.replace(year=year, month=month, day=day)
+
+
+def _build_trend_dates(anchor_timestamp: datetime, range_name: str) -> list:
+    anchor_date = anchor_timestamp.date()
+    normalized_range = str(range_name or "").lower()
+
+    if normalized_range == "month":
+        start_date = _shift_month(anchor_date, -1)
+    else:
+        start_date = anchor_date - timedelta(days=6)
+
+    total_days = max(1, (anchor_date - start_date).days + 1)
+    return [
+        start_date + timedelta(days=offset)
+        for offset in range(total_days)
+    ]
 
 
 def _build_tick_step(max_value: int) -> int:
@@ -253,18 +373,15 @@ def build_dashboard_stats(rows: list[dict], range_name: str = "week") -> dict:
     country_buckets: dict[tuple[str, str], dict] = {}
     map_buckets: dict[tuple[float, float, str, str, str], dict] = {}
     recent_detections = []
-    now_utc = datetime.now(timezone.utc)
-    trend_dates = [
-        (now_utc - timedelta(days=offset)).date()
-        for offset in range(range_days - 1, -1, -1)
-    ]
-    trend_date_set = set(trend_dates)
 
     sorted_rows = sorted(
         rows,
         key=lambda row: _parse_timestamp(row.get("created_at")) or datetime.min.replace(tzinfo=timezone.utc),
         reverse=True,
     )
+    anchor_timestamp = _resolve_trend_anchor_timestamp()
+    trend_dates = _build_trend_dates(anchor_timestamp, range_name)
+    trend_date_set = set(trend_dates)
 
     for index, row in enumerate(sorted_rows):
         status = str(row.get("status") or "").lower()
@@ -402,10 +519,12 @@ def build_dashboard_stats(rows: list[dict], range_name: str = "week") -> dict:
         "map_points": map_points,
         "recent_detections": recent_detections,
         "trend_range": "month" if range_days == 30 else "week",
-        "trend_days": range_days,
+        "trend_days": len(trend_dates),
         "trend_meta": {
             "max_value": max_trend_value,
             "y_ticks": _build_y_ticks(max_trend_value),
+            "start_day": trend_dates[0].isoformat() if trend_dates else None,
+            "end_day": trend_dates[-1].isoformat() if trend_dates else None,
         },
         "data_source": "supabase",
     }

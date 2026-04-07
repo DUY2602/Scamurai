@@ -115,13 +115,9 @@ function getReadableEntries(source) {
 }
 
 function formatDateLabel(value) {
-  if (!value) {
-    return "Unknown";
-  }
-
-  const date = new Date(value);
+  const date = parseDashboardDate(value);
   if (Number.isNaN(date.getTime())) {
-    return String(value);
+    return value ? String(value) : "Unknown";
   }
 
   return date.toLocaleDateString(undefined, {
@@ -130,14 +126,29 @@ function formatDateLabel(value) {
   });
 }
 
-function formatTrendAxisLabel(value, compact = false) {
+function parseDashboardDate(value) {
   if (!value) {
-    return "Unknown";
+    return new Date(Number.NaN);
   }
 
-  const date = new Date(value);
+  if (value instanceof Date) {
+    return value;
+  }
+
+  const normalized = String(value).trim();
+  const dateOnlyMatch = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnlyMatch) {
+    const [, year, month, day] = dateOnlyMatch;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return new Date(normalized);
+}
+
+function formatTrendAxisLabel(value, compact = false) {
+  const date = parseDashboardDate(value);
   if (Number.isNaN(date.getTime())) {
-    return String(value);
+    return value ? String(value) : "Unknown";
   }
 
   return date.toLocaleDateString(undefined, compact
@@ -157,8 +168,8 @@ function buildTrendXAxisTicks(rows) {
   const step = Math.max(1, Math.ceil((total - 1) / Math.max(targetTickCount - 1, 1)));
 
   return rows.map((row, index) => {
-    const currentDate = new Date(row.day);
-    const previousDate = index > 0 ? new Date(rows[index - 1].day) : null;
+    const currentDate = parseDashboardDate(row.day);
+    const previousDate = index > 0 ? parseDashboardDate(rows[index - 1].day) : null;
     const isBoundary =
       index === 0 ||
       index === total - 1 ||

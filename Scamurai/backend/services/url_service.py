@@ -2,6 +2,7 @@ import joblib
 import math
 import pandas as pd
 from pathlib import Path
+from urllib.parse import urlparse, urlunparse
 
 from backend.services.asset_paths import find_asset_dir
 from backend.services.model_runtime import classify_status, load_url_thresholds
@@ -23,12 +24,44 @@ def normalize_risk_score(probability_percent: float) -> float:
     return int(max(0, min(100, math.ceil(probability_percent))))
 
 
+def normalize_url_for_detection(url: str) -> str:
+    normalized = str(url or "").strip().lower().replace("[", "").replace("]", "")
+    address = normalized if "://" in normalized else f"http://{normalized}"
+
+    try:
+        parsed = urlparse(address)
+    except Exception:
+        parsed = urlparse("http://error-url.com")
+
+    hostname = (parsed.hostname or "").lower()
+    port = parsed.port
+    netloc = hostname
+    if port and not (
+        (parsed.scheme == "http" and port == 80)
+        or (parsed.scheme == "https" and port == 443)
+    ):
+        netloc = f"{hostname}:{port}"
+
+    path = parsed.path or ""
+    if path == "/":
+        path = ""
+
+    return urlunparse((
+        parsed.scheme or "http",
+        netloc,
+        path,
+        "",
+        parsed.query or "",
+        "",
+    ))
+
+
 def extract_features(url: str) -> dict:
-    from urllib.parse import urlparse
     import math
     import re
 
-    parsed = urlparse(url if "://" in url else f"http://{url}")
+    canonical_url = normalize_url_for_detection(url)
+    parsed = urlparse(canonical_url)
     hostname = parsed.netloc.replace("www.", "")
     path = parsed.path or ""
     query = parsed.query or ""
@@ -75,18 +108,77 @@ def extract_features(url: str) -> dict:
         "subdomain_count": len(host_parts) - 2 if len(host_parts) > 2 else 0,
         "special_ratio": sum(full.count(char) for char in "-._@?&=") / (len(full) + 1),
         "has_number_in_host": int(any(char.isdigit() for char in hostname)),
-        "has_at_symbol": int("@" in url),
+        "has_at_symbol": int("@" in canonical_url),
         "path_depth": path.count("/"),
-        "has_redirect": int("//" in url.split("://", 1)[-1]),
+        "has_redirect": int("//" in canonical_url.split("://", 1)[-1]),
         "brand_in_subdomain": int(any(brand in subdomain for brand in brands)),
         "tld_in_path": int(any(marker in path for marker in (".com", ".net", ".org", ".io"))),
         "query_param_count": len([part for part in query.split("&") if part]),
-        "has_hex_encoding": int("%" in url),
+        "has_hex_encoding": int("%" in canonical_url),
+    }
+
+
+def _build_clean_homepage_result(url: str, normalized_url: str, features: dict) -> dict | None:
+    parsed = urlparse(normalized_url)
+    hostname = (parsed.hostname or "").lower()
+    host_parts = [part for part in hostname.split(".") if part]
+    is_clean_homepage = (
+        len(host_parts) == 2
+        and parsed.path in ("", "/")
+        and not parsed.query
+        and not parsed.fragment
+        and bool(hostname)
+        and bool(host_parts[-1])
+        and len(host_parts[-1]) >= 2
+        and features["is_popular_tld"] == 1
+        and features["is_trash_tld"] == 0
+        and features["has_ip"] == 0
+        and features["is_exec"] == 0
+        and features["keyword_count"] == 0
+        and features["subdomain_count"] == 0
+        and features["has_number_in_host"] == 0
+        and features["has_at_symbol"] == 0
+        and features["path_depth"] == 0
+        and features["has_redirect"] == 0
+        and features["brand_in_subdomain"] == 0
+        and features["tld_in_path"] == 0
+        and features["query_param_count"] == 0
+        and features["has_hex_encoding"] == 0
+        and features["dash_count"] <= 1
+        and features["entropy"] <= 3.9
+    )
+
+    if not is_clean_homepage:
+        return None
+
+    return {
+        "detection_type": "url",
+        "source_value": url,
+        "url": url,
+        "status": "safe",
+        "verdict": "BENIGN",
+        "predicted_class": "benign",
+        "decision_threshold": round(THREAT_THRESHOLD, 2),
+        "model_agreement": "heuristic_override",
+        "risk_score": 5,
+        "confidence": 99.0,
+        "is_malicious": False,
+        "is_suspicious": False,
+        "key_features": {
+            "clean_homepage_override": True,
+            "hostname": hostname,
+            "normalized_url": normalized_url,
+        },
     }
 
 
 def predict_url(url: str) -> dict:
+    normalized_url = normalize_url_for_detection(url)
     features = extract_features(url)
+    clean_homepage_result = _build_clean_homepage_result(url, normalized_url, features)
+    if clean_homepage_result is not None:
+        return clean_homepage_result
+
     frame = pd.DataFrame([features])[feature_names]
     scaled = pd.DataFrame(
         scaler.transform(frame),
