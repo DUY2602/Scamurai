@@ -1,0 +1,310 @@
+{
+  "topics": {
+    "url": {
+      "id": "url",
+      "title": "URL",
+      "source_path": null,
+      "distribution": {
+        "positive": 213037,
+        "negative": 433080,
+        "total": 646117
+      },
+      "distribution_labels": {
+        "positive": "Malicious",
+        "negative": "Benign"
+      },
+      "feature_rows": [
+        {
+          "id": "url_len",
+          "label": "URL length",
+          "positive": 56.9008,
+          "negative": 56.2332
+        },
+        {
+          "id": "entropy",
+          "label": "Entropy",
+          "positive": 4.1063,
+          "negative": 4.1321
+        },
+        {
+          "id": "keyword_count",
+          "label": "Keyword count",
+          "positive": 0.0643,
+          "negative": 0.0718
+        },
+        {
+          "id": "subdomain_count",
+          "label": "Subdomain count",
+          "positive": 0.4798,
+          "negative": 0.3818
+        }
+      ],
+      "top_features": [
+        {
+          "id": "url_len",
+          "label": "Url Len",
+          "importance": 100.0,
+          "raw_importance": 1086.02469
+        },
+        {
+          "id": "hostname_len",
+          "label": "Hostname Len",
+          "importance": 97.05,
+          "raw_importance": 1054.020641
+        },
+        {
+          "id": "digit_ratio",
+          "label": "Digit Ratio",
+          "importance": 76.8,
+          "raw_importance": 834.018655
+        },
+        {
+          "id": "path_depth",
+          "label": "Path Depth",
+          "importance": 72.29,
+          "raw_importance": 785.059668
+        },
+        {
+          "id": "special_ratio",
+          "label": "Special Ratio",
+          "importance": 62.52,
+          "raw_importance": 679.016779
+        },
+        {
+          "id": "entropy",
+          "label": "Entropy",
+          "importance": 42.27,
+          "raw_importance": 459.011391
+        },
+        {
+          "id": "query_param_count",
+          "label": "Query Param Count",
+          "importance": 40.89,
+          "raw_importance": 444.067029
+        },
+        {
+          "id": "dot_count",
+          "label": "Dot Count",
+          "importance": 40.43,
+          "raw_importance": 439.031693
+        },
+        {
+          "id": "subdomain_count",
+          "label": "Subdomain Count",
+          "importance": 25.14,
+          "raw_importance": 273.032827
+        },
+        {
+          "id": "keyword_count",
+          "label": "Keyword Count",
+          "importance": 21.82,
+          "raw_importance": 237.018612
+        }
+      ]
+    },
+    "file": {
+      "id": "file",
+      "title": "File",
+      "source_path": null,
+      "distribution": {
+        "positive": 4165,
+        "negative": 2880,
+        "total": 7045
+      },
+      "distribution_labels": {
+        "positive": "Malware",
+        "negative": "Benign"
+      },
+      "feature_rows": [
+        {
+          "id": "sections",
+          "label": "Sections",
+          "positive": 4.9299,
+          "negative": 6.9726
+        },
+        {
+          "id": "avg_entropy",
+          "label": "Avg entropy",
+          "positive": 4.9248,
+          "negative": 2.9438
+        },
+        {
+          "id": "imports",
+          "label": "Imports",
+          "positive": 100.8579,
+          "negative": 144.5333
+        },
+        {
+          "id": "dlls",
+          "label": "DLLs",
+          "positive": 4.2687,
+          "negative": 17.9035
+        }
+      ],
+      "top_features": [
+        {
+          "id": "SizeOfImage",
+          "label": "Sizeofimage",
+          "importance": 100.0,
+          "raw_importance": 1614.035209
+        },
+        {
+          "id": "MaxEntropy",
+          "label": "Maxentropy",
+          "importance": 99.22,
+          "raw_importance": 1601.52143
+        },
+        {
+          "id": "AvgEntropy",
+          "label": "Avgentropy",
+          "importance": 93.49,
+          "raw_importance": 1509.031937
+        },
+        {
+          "id": "Imports",
+          "label": "Imports",
+          "importance": 79.06,
+          "raw_importance": 1276.020468
+        },
+        {
+          "id": "DLLs",
+          "label": "Dlls",
+          "importance": 68.22,
+          "raw_importance": 1101.049437
+        },
+        {
+          "id": "Sections",
+          "label": "Sections",
+          "importance": 37.42,
+          "raw_importance": 604.02017
+        },
+        {
+          "id": "ImageBase",
+          "label": "Imagebase",
+          "importance": 35.64,
+          "raw_importance": 575.263945
+        },
+        {
+          "id": "HasVersionInfo",
+          "label": "Hasversioninfo",
+          "importance": 12.02,
+          "raw_importance": 194.023734
+        },
+        {
+          "id": "HasSensitiveAPI",
+          "label": "Hassensitiveapi",
+          "importance": 7.06,
+          "raw_importance": 114.01959
+        },
+        {
+          "id": "SuspiciousSections",
+          "label": "Suspicioussections",
+          "importance": 3.41,
+          "raw_importance": 55.01408
+        }
+      ]
+    },
+    "email": {
+      "id": "email",
+      "title": "Email",
+      "source_path": null,
+      "distribution": {
+        "positive": 1500,
+        "negative": 8500,
+        "total": 10000
+      },
+      "distribution_labels": {
+        "positive": "Spam",
+        "negative": "Ham"
+      },
+      "feature_rows": [
+        {
+          "id": "text_length",
+          "label": "Text length",
+          "positive": 148.2707,
+          "negative": 217.1038
+        },
+        {
+          "id": "word_count",
+          "label": "Word count",
+          "positive": 23.344,
+          "negative": 36.0026
+        },
+        {
+          "id": "link_count",
+          "label": "Link count",
+          "positive": 0.0,
+          "negative": 0.0
+        },
+        {
+          "id": "exclamation_count",
+          "label": "Exclamation count",
+          "positive": 1.0,
+          "negative": 0.4006
+        }
+      ],
+      "top_features": [
+        {
+          "id": "you",
+          "label": "You",
+          "importance": 100.0,
+          "raw_importance": 2.784156
+        },
+        {
+          "id": "the",
+          "label": "The",
+          "importance": 98.89,
+          "raw_importance": 2.753248
+        },
+        {
+          "id": "url url",
+          "label": "Url Url",
+          "importance": 91.14,
+          "raw_importance": 2.537342
+        },
+        {
+          "id": "our",
+          "label": "Our",
+          "importance": 90.55,
+          "raw_importance": 2.521016
+        },
+        {
+          "id": "nan",
+          "label": "Nan",
+          "importance": 88.06,
+          "raw_importance": 2.451722
+        },
+        {
+          "id": "click",
+          "label": "Click",
+          "importance": 87.13,
+          "raw_importance": 2.42594
+        },
+        {
+          "id": "your",
+          "label": "Your",
+          "importance": 83.49,
+          "raw_importance": 2.324489
+        },
+        {
+          "id": "url date",
+          "label": "Url Date",
+          "importance": 80.2,
+          "raw_importance": 2.232905
+        },
+        {
+          "id": "date",
+          "label": "Date",
+          "importance": 73.11,
+          "raw_importance": 2.035399
+        },
+        {
+          "id": "click here",
+          "label": "Click Here",
+          "importance": 72.05,
+          "raw_importance": 2.005978
+        }
+      ]
+    }
+  }
+}

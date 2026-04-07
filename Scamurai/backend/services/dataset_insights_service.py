@@ -112,6 +112,41 @@ def _load_joblib_if_exists(path: Path | None):
         return None
 
 
+def _find_dataset_snapshot_path() -> Path | None:
+    return maybe_find_asset_path(
+        Path(__file__),
+        "Scamurai",
+        "backend",
+        "assets",
+        "dataset_insights_snapshot.json",
+    ) or maybe_find_asset_path(
+        Path(__file__),
+        "backend",
+        "assets",
+        "dataset_insights_snapshot.json",
+    )
+
+
+def _load_dataset_snapshot() -> dict | None:
+    snapshot_path = _find_dataset_snapshot_path()
+    if snapshot_path is None:
+        return None
+
+    try:
+        payload = json.loads(snapshot_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+    return payload if isinstance(payload, dict) else None
+
+
+def _get_snapshot_topic(topic_id: str) -> dict | None:
+    payload = _load_dataset_snapshot()
+    topics = payload.get("topics") if isinstance(payload, dict) else None
+    topic = topics.get(topic_id) if isinstance(topics, dict) else None
+    return topic if isinstance(topic, dict) else None
+
+
 def _find_email_dataset_path() -> Path | None:
     candidates = [
         ("Email", "data", "email_classification_dataset.csv"),
@@ -229,6 +264,9 @@ def _get_email_top_features() -> list[dict]:
 def _load_url_dataset() -> dict:
     source_path = maybe_find_asset_path(Path(__file__), "URL", "data", "processed_malicious_url.csv")
     if source_path is None:
+        snapshot_topic = _get_snapshot_topic("url")
+        if snapshot_topic is not None:
+            return snapshot_topic
         return _build_topic_payload(
             "url",
             "URL",
@@ -287,6 +325,9 @@ def _load_url_dataset() -> dict:
 def _load_file_dataset() -> dict:
     source_path = maybe_find_asset_path(Path(__file__), "FILE", "data", "malware_data_final.csv")
     if source_path is None:
+        snapshot_topic = _get_snapshot_topic("file")
+        if snapshot_topic is not None:
+            return snapshot_topic
         return _build_topic_payload(
             "file",
             "File",
@@ -351,6 +392,9 @@ def _load_file_dataset() -> dict:
 def _load_email_dataset() -> dict:
     source_path = _find_email_dataset_path()
     if source_path is None:
+        snapshot_topic = _get_snapshot_topic("email")
+        if snapshot_topic is not None:
+            return snapshot_topic
         return _build_topic_payload(
             "email",
             "Email",
@@ -445,6 +489,7 @@ def get_dataset_insights() -> dict:
         maybe_find_asset_path(Path(__file__), "URL", "data", "processed_malicious_url.csv"),
         maybe_find_asset_path(Path(__file__), "FILE", "data", "malware_data_final.csv"),
         _find_email_dataset_path(),
+        _find_dataset_snapshot_path(),
     ]
     signature = tuple(
         (str(path), path.stat().st_mtime_ns, path.stat().st_size) if path else None
