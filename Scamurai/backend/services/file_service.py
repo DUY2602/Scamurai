@@ -44,6 +44,7 @@ MODEL_METADATA = get_model_metadata("file")
 KNOWN_CLEAN_SYSTEM_FILES = ("notepad.exe", "calc.exe", "cmd.exe", "mspaint.exe", "taskmgr.exe")
 
 FEATURES = [
+    # v1 baseline features (10)
     "Sections",
     "AvgEntropy",
     "MaxEntropy",
@@ -54,6 +55,13 @@ FEATURES = [
     "ImageBase",
     "SizeOfImage",
     "HasVersionInfo",
+    # v2 new features (6)
+    "is_packed",
+    "import_category_score",
+    "has_tls",
+    "export_table_size",
+    "resource_entropy",
+    "api_category_score",
 ]
 
 SENSITIVE_APIS = {
@@ -215,7 +223,7 @@ def predict_file(filename: str, raw: bytes) -> dict:
 
     # Get model probabilities
     lgbm_prob = float(lgbm.predict_proba(scaled)[0][1]) if hasattr(lgbm, "predict_proba") else None
-    xgb_prob = float(xgb.predict_proba(scaled)[0][1]) if hasattr(xgb, "predict_proba") else None
+    xgb_prob = float(xgb.predict_proba(scaled.values)[0][1]) if hasattr(xgb, "predict_proba") else None
 
     if lgbm_prob is not None and xgb_prob is not None:
         avg_prob = (lgbm_prob + xgb_prob) / 2
@@ -224,7 +232,7 @@ def predict_file(filename: str, raw: bytes) -> dict:
         model_agreement = "high" if abs(lgbm_prob - xgb_prob) <= 0.15 else "mixed"
     else:
         lgbm_pred = int(lgbm.predict(scaled)[0]) if hasattr(lgbm, "predict") else 0
-        xgb_pred = int(xgb.predict(scaled)[0]) if hasattr(xgb, "predict") else 0
+        xgb_pred = int(xgb.predict(scaled.values)[0]) if hasattr(xgb, "predict") else 0
         avg_prob = 0.5 if lgbm_pred == 1 or xgb_pred == 1 else 0.0
         risk_score = normalize_risk_score(avg_prob * 100)
         confidence = probability_confidence(avg_prob)
