@@ -222,21 +222,41 @@ def predict_file(filename: str, raw: bytes) -> dict:
     )
 
     # Get model probabilities
-    lgbm_prob = float(lgbm.predict_proba(scaled)[0][1]) if hasattr(lgbm, "predict_proba") else None
-    xgb_prob = float(xgb.predict_proba(scaled.values)[0][1]) if hasattr(xgb, "predict_proba") else None
+    try:
+        lgbm_prob = float(lgbm.predict_proba(scaled)[0][1]) if hasattr(lgbm, "predict_proba") else None
+    except Exception:
+        lgbm_prob = None
+    
+    try:
+        # For XGBoost: try predict_proba first
+        if hasattr(xgb, "predict_proba"):
+            xgb_prob = float(xgb.predict_proba(scaled.values)[0][1])
+        elif hasattr(xgb, "predict"):
+            # Fallback: use predict on numpy array, convert to probability
+            pred_class = int(xgb.predict(scaled.values)[0])
+            xgb_prob = 1.0 if pred_class == 1 else 0.0
+        else:
+            xgb_prob = None
+    except Exception:
+        xgb_prob = None
 
     if lgbm_prob is not None and xgb_prob is not None:
         avg_prob = (lgbm_prob + xgb_prob) / 2
         risk_score = normalize_risk_score(avg_prob * 100)
         confidence = probability_confidence(avg_prob)
         model_agreement = "high" if abs(lgbm_prob - xgb_prob) <= 0.15 else "mixed"
-    else:
-        lgbm_pred = int(lgbm.predict(scaled)[0]) if hasattr(lgbm, "predict") else 0
-        xgb_pred = int(xgb.predict(scaled.values)[0]) if hasattr(xgb, "predict") else 0
-        avg_prob = 0.5 if lgbm_pred == 1 or xgb_pred == 1 else 0.0
+    elif lgbm_prob is not None or xgb_prob is not None:
+        # Use whichever is available
+        avg_prob = lgbm_prob if lgbm_prob is not None else xgb_prob
         risk_score = normalize_risk_score(avg_prob * 100)
         confidence = probability_confidence(avg_prob)
-        model_agreement = "high" if lgbm_pred == xgb_pred else "mixed"
+        model_agreement = "single_model"
+    else:
+        # Both models failed, default to 0 (benign)
+        avg_prob = 0.0
+        risk_score = 0
+        confidence = "unknown"
+        model_agreement = "unavailable"
 
     # Compute file hash
     file_sha256 = compute_sha256_from_bytes(raw)
