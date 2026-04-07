@@ -1,0 +1,41 @@
+{
+  "safe_hostnames": [
+    "app.ganttpro.com",
+    "app.shopee.vn",
+    "cellphones.com.vn",
+    "ngoisao.vnexpress.net",
+    "shopee.vn",
+    "www.booking.com",
+    "www.thegioididong.com"
+  ],
+  "safe_registered_domains": [
+    "booking.com",
+    "shopee.vn",
+    "thegioididong.com"
+  ],
+  "safe_path_signatures": [
+    "cellphones.com.vn|html_content_depth_3_digits_1",
+    "vnexpress.net|html_content_depth_1_digits_1"
+  ],
+  "threat_hostnames": [
+    "bangiaygiare.com"
+  ],
+  "threat_registered_domains": [
+    "bangiaygiare.com"
+  ],
+  "threat_path_signatures": [],
+  "safe_observations": {
+    "host:cellphones.com.vn": 1,
+    "path:cellphones.com.vn|html_content_depth_3_digits_1": 1,
+    "host:www.thegioididong.com": 1,
+    "domain:thegioididong.com": 1
+  },
+  "threat_observations": {
+    "host:ngan-hang-uy-tin.com": 1,
+    "domain:ngan-hang-uy-tin.com": 1,
+    "host:vuln-website.com": 1,
+    "domain:vuln-website.com": 1,
+    "host:bangiaygiare.com": 2,
+    "domain:bangiaygiare.com": 2
+  }
+}
