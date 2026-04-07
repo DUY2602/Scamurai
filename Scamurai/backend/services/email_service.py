@@ -1,9 +1,12 @@
 import math
 
+from backend.config.model_metadata_registry import get_model_metadata
+from backend.config.threshold_registry import get_threshold_config
 from backend.services.predict_email import predict_email_bytes, predict_email_parts
 
-SUSPICIOUS_LOWER_BOUND = 0.45
-SUSPICIOUS_UPPER_BOUND = 0.6
+# Load from centralizedthreshold registry
+THRESHOLD_CONFIG = get_threshold_config("email")
+MODEL_METADATA = get_model_metadata("email")
 
 
 def _build_api_result(result: dict, source_value: str) -> dict:
@@ -13,18 +16,20 @@ def _build_api_result(result: dict, source_value: str) -> dict:
     semantic_signals = result.get("semantic_signals", {})
     risk_score = int(max(0, min(100, math.ceil(spam_probability * 100))))
     confidence = spam_probability if predicted_label == "spam" else 1.0 - spam_probability
-    if spam_probability >= SUSPICIOUS_UPPER_BOUND:
-        status = "threat"
+    
+    # Use centralized thresholds for status determination
+    status = THRESHOLD_CONFIG.classify_status(risk_score)
+    
+    # Map status to verdict
+    if status == "threat":
         verdict = "SPAM"
         is_spam = True
         is_suspicious = False
-    elif spam_probability >= SUSPICIOUS_LOWER_BOUND:
-        status = "suspicious"
+    elif status == "suspicious":
         verdict = "SUSPICIOUS"
         is_spam = False
         is_suspicious = True
     else:
-        status = "safe"
         verdict = "HAM"
         is_spam = False
         is_suspicious = False
@@ -35,7 +40,8 @@ def _build_api_result(result: dict, source_value: str) -> dict:
         "status": status,
         "verdict": verdict,
         "predicted_class": predicted_label,
-        "decision_threshold": round(float(result["threshold"]) * 100, 2),
+        "decision_threshold": THRESHOLD_CONFIG.threat_threshold,
+        "decision_threshold_suspicious": THRESHOLD_CONFIG.suspicious_threshold,
         "signal_strength": "high" if risk_score >= 70 else "medium" if risk_score >= 40 else "low",
         "risk_score": risk_score,
         "confidence": round(confidence * 100, 2),
@@ -53,6 +59,11 @@ def _build_api_result(result: dict, source_value: str) -> dict:
             "used_semantic_predict_logic": True,
         },
         "spam_probability": round(spam_probability, 4),
+        # Model versioning and metadata
+        "model_info": {
+            "model_version": MODEL_METADATA.model_version,
+            "threshold_version": MODEL_METADATA.threshold_version,
+        },
     }
 
 

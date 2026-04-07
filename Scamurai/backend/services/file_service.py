@@ -1,17 +1,28 @@
+import hashlib
 import joblib
 import math
+import os
 import pandas as pd
 import pefile
 from pathlib import Path
+from typing import Any
 
+from backend.config.model_metadata_registry import get_model_metadata
+from backend.config.threshold_registry import get_threshold_config
 from backend.services.asset_paths import find_asset_dir
-from backend.services.model_runtime import classify_status, load_file_thresholds
 
 MODEL_DIR = find_asset_dir(Path(__file__), "FILE", "models")
 
 lgbm = joblib.load(MODEL_DIR / "lightgbm_malware_model.pkl")
 xgb = joblib.load(MODEL_DIR / "xgboost_malware_model.pkl")
 scaler = joblib.load(MODEL_DIR / "feature_scaler.pkl")
+
+# Load thresholds from centralized registry
+THRESHOLD_CONFIG = get_threshold_config("file")
+MODEL_METADATA = get_model_metadata("file")
+
+# Known clean system files whitelist
+KNOWN_CLEAN_SYSTEM_FILES = ("notepad.exe", "calc.exe", "cmd.exe", "mspaint.exe", "taskmgr.exe")
 
 FEATURES = [
     "Sections",
@@ -55,11 +66,27 @@ SENSITIVE_APIS = {
     b"Process32Next",
     b"IsDebuggerPresent",
 }
-THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD = load_file_thresholds(Path(__file__))
 
 
 class FileScanError(Exception):
     pass
+
+
+def compute_sha256_from_bytes(raw_bytes: bytes) -> str:
+    """Compute SHA256 hash of bytes."""
+    return hashlib.sha256(raw_bytes).hexdigest()
+
+
+def build_known_clean_whitelist() -> set[str]:
+    """Build whitelist of known clean system files."""
+    system_root = Path(os.environ.get("SystemRoot", r"C:\Windows"))
+    whitelist: set[str] = set()
+    for filename in KNOWN_CLEAN_SYSTEM_FILES:
+        candidate = system_root / "System32" / filename
+        if candidate.is_file():
+            with open(candidate, "rb") as f:
+                whitelist.add(hashlib.sha256(f.read()).hexdigest())
+    return whitelist
 
 
 def probability_confidence(probability: float) -> float:
@@ -120,6 +147,10 @@ def extract_features(raw: bytes, filename: str) -> dict:
 
 
 def predict_file(filename: str, raw: bytes) -> dict:
+    """
+    Predict if a file is malware using ensemble of LGBM and XGB models.
+    Includes SHA256 whitelist check and uses centralized thresholds.
+    """
     features = extract_features(raw, filename)
     frame = pd.DataFrame([features])[FEATURES]
     scaled = pd.DataFrame(
@@ -128,6 +159,7 @@ def predict_file(filename: str, raw: bytes) -> dict:
         index=frame.index,
     )
 
+    # Get model probabilities
     lgbm_prob = float(lgbm.predict_proba(scaled)[0][1]) if hasattr(lgbm, "predict_proba") else None
     xgb_prob = float(xgb.predict_proba(scaled)[0][1]) if hasattr(xgb, "predict_proba") else None
 
@@ -137,23 +169,55 @@ def predict_file(filename: str, raw: bytes) -> dict:
         confidence = probability_confidence(avg_prob)
         model_agreement = "high" if abs(lgbm_prob - xgb_prob) <= 0.15 else "mixed"
     else:
-        lgbm_pred = int(lgbm.predict(scaled)[0])
-        xgb_pred = int(xgb.predict(scaled)[0])
-        avg_prob = None
-        vote_ratio = (lgbm_pred + xgb_pred) / 2
-        risk_score = normalize_risk_score(vote_ratio * 100)
-        confidence = probability_confidence(vote_ratio)
+        lgbm_pred = int(lgbm.predict(scaled)[0]) if hasattr(lgbm, "predict") else 0
+        xgb_pred = int(xgb.predict(scaled)[0]) if hasattr(xgb, "predict") else 0
+        avg_prob = 0.5 if lgbm_pred == 1 or xgb_pred == 1 else 0.0
+        risk_score = normalize_risk_score(avg_prob * 100)
+        confidence = probability_confidence(avg_prob)
         model_agreement = "high" if lgbm_pred == xgb_pred else "mixed"
 
-    predicted_class = (
-        "malware"
-        if (avg_prob is not None and avg_prob >= 0.5) or (avg_prob is None and risk_score >= 50)
-        else "benign"
-    )
-    status = classify_status(risk_score, THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD)
-    verdict = "MALWARE" if status == "threat" else ("SUSPICIOUS" if status == "suspicious" else "BENIGN")
-    decision_threshold = round(THREAT_THRESHOLD, 2)
-    key_features = {
+    # Compute file hash
+    file_sha256 = compute_sha256_from_bytes(raw)
+
+    # Build whitelist
+    try:
+        whitelist = build_known_clean_whitelist()
+    except Exception:
+        whitelist = set()
+
+    # Check whitelist first
+    if file_sha256 in whitelist:
+        return {
+            "detection_type": "file",
+            "source_value": filename,
+            "filename": filename,
+            "status": "safe",
+            "verdict": "BENIGN",
+            "predicted_class": "benign",
+            "decision_threshold": THRESHOLD_CONFIG.threat_threshold,
+            "decision_threshold_suspicious": THRESHOLD_CONFIG.suspicious_threshold,
+            "model_agreement": "whitelist",
+            "risk_score": 0,
+            "confidence": 99.99,
+            "is_malicious": False,
+            "is_suspicious": False,
+            "key_features": {k: v for k, v in features.items() if k in ["Sections", "AvgEntropy", "MaxEntropy", "SuspiciousSections", "Imports", "HasSensitiveAPI"]},
+            "model_info": {
+                "model_version": MODEL_METADATA.model_version,
+                "threshold_version": MODEL_METADATA.threshold_version,
+                "lgbm_prob": None,
+                "xgb_prob": None,
+                "avg_prob": 0.0,
+            },
+            "file_hash": file_sha256,
+            "risk_flag": "Known-clean SHA256 whitelist hit",
+        }
+
+    # Use centralized threshold for status classification
+    status = THRESHOLD_CONFIG.classify_status(risk_score)
+    verdict = "MALICIOUS" if status == "threat" else ("SUSPICIOUS" if status == "suspicious" else "BENIGN")
+
+    key_features_output = {
         "Sections": features["Sections"],
         "AvgEntropy": features["AvgEntropy"],
         "MaxEntropy": features["MaxEntropy"],
@@ -168,12 +232,23 @@ def predict_file(filename: str, raw: bytes) -> dict:
         "filename": filename,
         "status": status,
         "verdict": verdict,
-        "predicted_class": predicted_class,
-        "decision_threshold": decision_threshold,
+        "predicted_class": "malware" if status == "threat" else "benign",
+        "decision_threshold": THRESHOLD_CONFIG.threat_threshold,
+        "decision_threshold_suspicious": THRESHOLD_CONFIG.suspicious_threshold,
         "model_agreement": model_agreement,
         "risk_score": risk_score,
         "confidence": confidence,
         "is_malicious": status == "threat",
         "is_suspicious": status == "suspicious",
-        "key_features": key_features,
+        "key_features": key_features_output,
+        # Model versioning and metadata
+        "model_info": {
+            "model_version": MODEL_METADATA.model_version,
+            "threshold_version": MODEL_METADATA.threshold_version,
+            "lgbm_prob": round(lgbm_prob, 4) if lgbm_prob else None,
+            "xgb_prob": round(xgb_prob, 4) if xgb_prob else None,
+            "avg_prob": round(avg_prob, 4),
+        },
+        "file_hash": file_sha256,
+        "risk_flag": None,
     }

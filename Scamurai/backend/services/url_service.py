@@ -4,8 +4,9 @@ import pandas as pd
 from pathlib import Path
 from urllib.parse import urlparse, urlunparse
 
+from backend.config.model_metadata_registry import get_model_metadata
+from backend.config.threshold_registry import get_threshold_config
 from backend.services.asset_paths import find_asset_dir
-from backend.services.model_runtime import classify_status, load_url_thresholds
 
 MODEL_DIR = find_asset_dir(Path(__file__), "URL", "models")
 
@@ -13,7 +14,10 @@ lgbm = joblib.load(MODEL_DIR / "lgbm_model.pkl")
 xgb = joblib.load(MODEL_DIR / "xgb_model.pkl")
 scaler = joblib.load(MODEL_DIR / "scaler.pkl")
 feature_names = joblib.load(MODEL_DIR / "feature_names.pkl")
-THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD = load_url_thresholds(Path(__file__))
+
+# Load from centralized threshold registry
+THRESHOLD_CONFIG = get_threshold_config("url")
+MODEL_METADATA = get_model_metadata("url")
 
 
 def probability_confidence(probability: float) -> float:
@@ -158,7 +162,8 @@ def _build_clean_homepage_result(url: str, normalized_url: str, features: dict) 
         "status": "safe",
         "verdict": "BENIGN",
         "predicted_class": "benign",
-        "decision_threshold": round(THREAT_THRESHOLD, 2),
+        "decision_threshold": THRESHOLD_CONFIG.threat_threshold,
+        "decision_threshold_suspicious": THRESHOLD_CONFIG.suspicious_threshold,
         "model_agreement": "heuristic_override",
         "risk_score": 5,
         "confidence": 99.0,
@@ -168,6 +173,13 @@ def _build_clean_homepage_result(url: str, normalized_url: str, features: dict) 
             "clean_homepage_override": True,
             "hostname": hostname,
             "normalized_url": normalized_url,
+        },
+        "model_info": {
+            "model_version": MODEL_METADATA.model_version,
+            "threshold_version": MODEL_METADATA.threshold_version,
+            "lgbm_prob": None,
+            "xgb_prob": None,
+            "avg_prob": 0.0,
         },
     }
 
@@ -192,10 +204,9 @@ def predict_url(url: str) -> dict:
 
     risk_score = normalize_risk_score(avg_prob * 100)
     confidence = probability_confidence(avg_prob)
-    status = classify_status(risk_score, THREAT_THRESHOLD, SUSPICIOUS_THRESHOLD)
+    status = THRESHOLD_CONFIG.classify_status(risk_score)
     verdict = "MALICIOUS" if status == "threat" else ("SUSPICIOUS" if status == "suspicious" else "BENIGN")
     predicted_class = "malicious" if avg_prob >= 0.5 else "benign"
-    decision_threshold = round(THREAT_THRESHOLD, 2)
     model_agreement = "high" if abs(lgbm_prob - xgb_prob) <= 0.15 else "mixed"
     key_features = {
         "keyword_count": features["keyword_count"],
@@ -213,11 +224,19 @@ def predict_url(url: str) -> dict:
         "status": status,
         "verdict": verdict,
         "predicted_class": predicted_class,
-        "decision_threshold": decision_threshold,
+        "decision_threshold": THRESHOLD_CONFIG.threat_threshold,
+        "decision_threshold_suspicious": THRESHOLD_CONFIG.suspicious_threshold,
         "model_agreement": model_agreement,
         "risk_score": risk_score,
         "confidence": confidence,
         "is_malicious": status == "threat",
         "is_suspicious": status == "suspicious",
         "key_features": key_features,
+        "model_info": {
+            "model_version": MODEL_METADATA.model_version,
+            "threshold_version": MODEL_METADATA.threshold_version,
+            "lgbm_prob": round(lgbm_prob, 4),
+            "xgb_prob": round(xgb_prob, 4),
+            "avg_prob": round(avg_prob, 4),
+        },
     }

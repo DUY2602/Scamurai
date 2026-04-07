@@ -38,3 +38,4 @@ Thumbs.db
 # Dataset / training artifacts
 **/data/
 **/train/
+**/Dataset/
