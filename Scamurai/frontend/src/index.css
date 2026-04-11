@@ -1551,8 +1551,8 @@ img {
   cursor: inherit;
 }
 
-.leaflet-control-zoom a {
-  color: var(--text);
+.map-shell__leaflet .leaflet-control-zoom {
+  display: none;
 }
 
 .map-shell__attribution {
@@ -1579,14 +1579,18 @@ img {
   top: 0.9rem;
   left: 0.9rem;
   z-index: 2;
+  display: inline-flex;
+  align-items: center;
   border: 1px solid rgba(17, 40, 58, 0.12);
-  background: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(244, 249, 255, 0.94));
   color: var(--text);
   border-radius: 999px;
   padding: 0.58rem 0.9rem;
   font-size: 0.82rem;
   font-weight: 800;
   letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
   box-shadow: var(--shadow-soft);
   transition: transform 0.22s ease, background 0.22s ease, box-shadow 0.22s ease;

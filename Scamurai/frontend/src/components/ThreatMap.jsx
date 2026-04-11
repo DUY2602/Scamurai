@@ -45,6 +45,7 @@ function MapResetButton({ compact = false }) {
     <button
       className={`map-reset-button${compact ? " map-reset-button--compact" : ""}`}
       onClick={() => map.setView(DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM)}
+      aria-label="Reset map view"
       type="button"
     >
       Reset view
@@ -138,7 +139,7 @@ export default function ThreatMap({
         preferCanvas
         scrollWheelZoom
         zoom={DEFAULT_MAP_ZOOM}
-        zoomControl={!compact}
+        zoomControl={false}
       >
         <MapResetButton compact={compact} />
         <TileLayer
