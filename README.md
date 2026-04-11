@@ -1,220 +1,228 @@
-# Malware Detection System – HCMC Assignment
+# Scamurai
 
-**Three modular detectors** for different malware/spam threats:
+Scamurai is a cybersecurity web app that detects threats across three inputs:
 
-- **FILE** → Malware in PE executables (.exe, .dll) using static features
-- **URL**  → Malicious / phishing URLs using lexical & structural features
-- **Email** → Spam or malicious email content using text features
+- `URL` scan for phishing or malicious links
+- `File` scan for suspicious PE executables
+- `Email` scan for spam or phishing content
 
-Each module:
+The project includes:
 
-- Loads **all** compatible `*_model.pkl` files from its `models/` folder
-- Extracts appropriate features from the input
-- Runs inference with every available model
-- Shows per-model **prediction** + **confidence score**
+- a FastAPI backend in [Scamurai/backend](/d:/Assignment%203/Scamurai/backend)
+- a React + Vite frontend in [Scamurai/frontend](/d:/Assignment%203/Scamurai/frontend)
+- ML assets and training resources in [URL](/d:/Assignment%203/URL), [FILE](/d:/Assignment%203/FILE), and [Email](/d:/Assignment%203/Email)
 
----
+## Requirements
+
+Install these first:
+
+- Python `3.10+` recommended
+- Node.js `18+`
+- npm
 
 ## Project Structure
 
-```
-assignment-hcmc1_6/
-├── Email/
-│   ├── data/                # CSV contains emails data here
-│   ├── models/              # *_model.pkl files go here
-│   └── scripts/             # *.ipynb files for model training & EDA
-├── FILE/
-│   ├── data/                  # CSV contains files data here
-│   ├── models/                # *_model.pkl files go here
-│   ├── scripts/               # *.ipynb files for model training & EDA
-│   ├── utils/                 # *_model.pkl files go here
-│       ├── preprocess.py      # Extract features from files
-│   └── main.py                # Test model with custom input test
-├── URL/
-│   ├── data/                  # CSV contains URL data here
-│   ├── models/                # *_model.pkl files go here
-│   ├── scripts/               # *.ipynb files for model training & EDA
-│   ├── utils/                 # *_model.pkl files go here
-│       ├── preprocess.py      # Extract features from URLs
-│   └── main.py                # Test model with custom input test
-├── requirements.txt
-└── README.md
+```text
+d:\Assignment 3
+|-- Scamurai/
+|   |-- backend/          FastAPI app
+|   |-- frontend/         React frontend
+|   `-- requirements.txt  Backend Python dependencies
+|-- URL/                  URL model assets and training files
+|-- FILE/                 File model assets and training files
+|-- Email/                Email model assets and training files
+|-- api/                  Vercel Python entrypoint
+|-- start-web.bat         Local one-click startup script
+|-- requirements.txt      Root deployment requirements
+`-- .env.local            Local environment overrides
 ```
 
----
+## Local Run
 
-## ⚡ Quick Setup (do once)
+### Option 1: Quick start with `start-web.bat`
 
-1. Use **Python 3.8 – 3.13** (3.11 recommended)
-2. Open terminal / PowerShell and go to project folder
+This is the easiest way to run the app locally.
+
+1. Open the repo root:
 
 ```powershell
-cd C:\Users\LENOVO\assignment-hcmc1_6
+cd "d:\Assignment 3"
 ```
 
-3. (Strongly recommended) Create virtual environment
+2. Create a virtual environment if you do not have one yet:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1      # PowerShell
-# or for cmd:
-# .\.venv\Scripts\activate
 ```
 
-4. Install dependencies
+3. Install backend dependencies:
 
-```bash
-pip install -r requirements.txt
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r Scamurai\requirements.txt
 ```
 
----
+4. Start the project:
 
-## ▶️ Running the Modules
-
-### 1. File Malware Scanner (PE executables)
-
-```bash
-python FILE/main.py
+```powershell
+.\start-web.bat
 ```
 
-**Input example**
-`C:\Users\LENOVO\assignment-hcmc1_6\FILE\data\sample.exe`
+What this script does:
 
-**Typical output**
+- loads variables from `.env.local` if the file exists
+- starts the FastAPI backend at `http://127.0.0.1:8000`
+- starts the React frontend at `http://127.0.0.1:5173`
+- auto-installs frontend packages if `node_modules` is missing
 
-- List of loaded models
-- Extracted features (entropy, sections, imports, suspicious APIs, …)
-- Table like:
+After startup, open:
 
-```
-Model          Prediction  Confidence
--------------  ----------  ----------
-kmeans          MALWARE      0.62
-lightgbm        BENIGN       0.89
-xgboost         BENIGN       0.94
-```
+- frontend: `http://127.0.0.1:5173`
+- backend docs: `http://127.0.0.1:8000/docs`
 
-### 2. Malicious URL Detector
+### Option 2: Run backend and frontend manually
 
-```bash
-python URL/main.py
-```
+Use this if you want more control during debugging.
 
-**Input examples**
+#### Backend
 
-```
-http://secure-login-paypal-verify-2025.net/update
-https://www.google.com
-https://bit.ly/malicious-shortlink
+```powershell
+cd "d:\Assignment 3"
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r Scamurai\requirements.txt
+cd "d:\Assignment 3\Scamurai"
+d:\Assignment 3\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8000
 ```
 
-**Output shows**
+#### Frontend
 
-- Parsed URL features (length, dots, special chars, entropy, suspicious keywords, …)
-- Prediction table per model
+Open a second terminal:
 
-### 3. Email / Spam / Malicious Text Detector
-
-```bash
-EMAIL/scripts/Prediction.ipynb
+```powershell
+cd "d:\Assignment 3\Scamurai\frontend"
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173 --force
 ```
 
-**Input**
-Change the content in cell 4 and cell 5 in Prediction.ipynb file
+## Environment Variables
 
-**Output**
+Local values can be placed in [.env.local](/d:/Assignment%203/.env.local).
 
-- Exclamation Mark count
-- Number of link
-- Per-model prediction (SPAM / HAM)
-- Model's confidence 
+Common variables:
 
----
-**Custom Run**
-User can customize the test email they want the model to predict by changing the contents in Cell 4 and 5 in Prediction.ipynb File. By changing the sender domain, subject and email content just by copying and pasting, user can easily get result in 2-3 seconds in the terminal prompt along with the model's confidence, number link and exclamation mark count. In the future, this feature will be integrated onto a website where user can upload their email file and immediately get result without filling in each part as current
-## Demo Talking Points (for presentation / recording)
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_TABLE`
+- `ALLOWED_ORIGINS`
+- `VITE_API_BASE_URL`
+- `DASHBOARD_TIMEZONE`
+- `DASHBOARD_TREND_ANCHOR`
 
-1. “This project contains three separate detectors: for executable files, URLs, and email content.”
-2. Show running `python FILE/main.py` → input .exe → explain output
-3. Show running `python URL/main.py` → test clean + suspicious URLs
-4. Show running `python Email/main.py` → test phishing / normal email
-5. “Each module automatically tests all models in its `models/` folder. Adding a new trained model is as simple as dropping the .pkl file there.”
+### Minimal local example
 
----
+```env
+SUPABASE_URL=your_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+SUPABASE_TABLE=detection_results
+```
 
-## Troubleshooting Checklist
+Notes:
 
-| Problem                         | Most likely cause / solution                                        |
-| ------------------------------- | ------------------------------------------------------------------- |
-| No models found                 | Run training notebook → check `models/` has `*.pkl` files      |
-| Cannot extract features         | Input file is not .exe/.dll                                         |
-| URL feature mismatch / KeyError | `feature_names.pkl` missing or doesn't match model training       |
-| ImportError / ModuleNotFound    | Re-run `pip install -r requirements.txt` in the virtual env       |
-| Confidence = N/A                | Model doesn't implement `predict_proba`                           |
-| Wrong directory / path errors   | Run commands from project root folder                               |
-| Models exist but not loaded     | File name must end with `_model.pkl` (check exact naming pattern) |
+- if Supabase is not configured, some persistence/dashboard features may be limited
+- the app can still run locally without every optional variable
 
----
-# assignment3-hcmc1-6
+## Install Commands
 
-## Deploy On Vercel
+### Backend dependencies
 
-This repo now includes a Vercel setup that serves:
+From the repo root:
 
-- `Scamurai/frontend` as the static React app
-- `api/index.py` as the Python entrypoint for the FastAPI backend
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r Scamurai\requirements.txt
+```
 
-### Recommended project settings
+### Frontend dependencies
 
-1. Import the repo into Vercel
-2. Keep the project root at the repository root
-3. Vercel will use:
-   - `vercel.json`
-   - root `requirements.txt`
-   - frontend build output from `Scamurai/frontend/dist`
+```powershell
+cd "d:\Assignment 3\Scamurai\frontend"
+npm install
+```
 
-### Local behavior after this change
+## Useful Local URLs
 
-- Frontend dev still uses `http://localhost:8000`
-- Production frontend defaults to `/api`
+- Frontend app: `http://127.0.0.1:5173`
+- Backend API: `http://127.0.0.1:8000`
+- Swagger docs: `http://127.0.0.1:8000/docs`
 
-### Important note
+## Troubleshooting
 
-The backend uses `lightgbm`, `xgboost`, `scikit-learn`, and bundled model files. If Vercel rejects the deployment because of Python package size or serverless runtime limits, the code/config is still correct, but you may need a less restrictive backend host such as Railway, Render, or Fly.io and point `VITE_API_BASE_URL` there.
+### Backend does not start
 
-## Deploy On Railway (2 Services)
+Check:
+
+- Python is installed
+- `.venv` exists
+- dependencies were installed from `Scamurai/requirements.txt`
+
+Try:
+
+```powershell
+cd "d:\Assignment 3\Scamurai"
+d:\Assignment 3\.venv\Scripts\python.exe -m uvicorn backend.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8000
+```
+
+### Frontend does not start
+
+Check:
+
+- Node.js is installed
+- `npm install` completed in `Scamurai/frontend`
+
+Try:
+
+```powershell
+cd "d:\Assignment 3\Scamurai\frontend"
+npm install
+npm run dev -- --host 127.0.0.1 --port 5173 --force
+```
+
+### URL/File/Email result looks outdated
+
+If you changed backend logic but the UI still shows old behavior:
+
+1. stop the backend process
+2. run [start-web.bat](/d:/Assignment%203/start-web.bat) again
+3. refresh the frontend page
+
+### Dashboard data does not appear
+
+Check:
+
+- `.env.local` is loaded correctly
+- Supabase credentials are valid
+- the `detection_results` table exists
+
+## Deployment
+
+### Railway
 
 Recommended split:
 
-- `backend` service on Railway using the repo root
-- `frontend` service on Railway using `Scamurai/frontend`
+- backend service from repository root using [Dockerfile](/d:/Assignment%203/Dockerfile)
+- frontend service from [Scamurai/frontend](/d:/Assignment%203/Scamurai/frontend) using [Scamurai/frontend/Dockerfile](/d:/Assignment%203/Scamurai/frontend/Dockerfile)
 
-### Backend service
-
-- Root directory: repository root
-- Builder: Dockerfile
-- Railway will build from [Dockerfile](/d:/Assignment%203/Dockerfile)
-
-Environment variables:
+Backend env example:
 
 - `ALLOWED_ORIGINS=https://your-frontend-domain.up.railway.app`
 
-### Frontend service
-
-- Root directory: `Scamurai/frontend`
-- Builder: Dockerfile
-- Railway will build from [Scamurai/frontend/Dockerfile](/d:/Assignment%203/Scamurai/frontend/Dockerfile)
-
-Environment variables:
+Frontend env example:
 
 - `VITE_API_BASE_URL=https://your-backend-domain.up.railway.app`
 
-### Deployment order
+### Vercel
 
-1. Deploy backend first
-2. Copy backend public URL
-3. Add `VITE_API_BASE_URL` to frontend service
-4. Deploy frontend
-5. Copy frontend public URL
-6. Add that URL to backend `ALLOWED_ORIGINS`
-7. Redeploy backend once more
+This repo also includes:
+
+- [api/index.py](/d:/Assignment%203/api/index.py) for Python entrypoint
+- root [requirements.txt](/d:/Assignment%203/requirements.txt) for deployment installs
+
+If Vercel runtime limits are too strict for the backend ML stack, prefer Railway or another less restrictive host for the API.

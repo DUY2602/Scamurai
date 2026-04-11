@@ -18,6 +18,7 @@
     "vnexpress.net|html_content_depth_1_digits_1"
   ],
   "threat_hostnames": [
+    "45.67.89.120",
     "bangiaygiare.com"
   ],
   "threat_registered_domains": [
@@ -42,6 +43,8 @@
     "host:vuln-website.com": 1,
     "domain:vuln-website.com": 1,
     "host:bangiaygiare.com": 2,
-    "domain:bangiaygiare.com": 2
+    "domain:bangiaygiare.com": 2,
+    "host:45.67.89.120": 2,
+    "host:8.8.8.8": 1
   }
 }

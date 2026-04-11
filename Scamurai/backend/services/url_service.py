@@ -1081,6 +1081,10 @@ def _compute_post_model_adjustment(
         adjustment += 0.45
         reasons.append("security_test_artifact_boost")
 
+    if features["has_ip"] and not local_dev_context:
+        adjustment += 0.28
+        reasons.append("public_ip_host_boost")
+
     if open_redirect_signal:
         adjustment += 0.35
         reasons.append("open_redirect_boost")
@@ -1150,6 +1154,9 @@ def _compute_post_model_adjustment(
     elif security_test_artifact in {"eicar_test_artifact", "security_test_payload"}:
         adjusted_prob = max(adjusted_prob, 0.95)
         reasons.append("security_test_artifact_cap")
+    elif features["has_ip"] and not local_dev_context:
+        adjusted_prob = max(adjusted_prob, 0.88)
+        reasons.append("public_ip_host_cap")
     elif safe_domain and threat_signals == 1:
         adjusted_prob = min(adjusted_prob, 0.35)
         reasons.append("trusted_domain_caution_cap")
