@@ -4,6 +4,7 @@ from threading import Lock
 
 from backend.services.asset_paths import maybe_find_asset_path
 from backend.services.supabase_service import (
+    _is_web_detection_row,
     build_dashboard_stats as build_supabase_dashboard_stats,
     fetch_detection_rows as fetch_supabase_detection_rows,
     is_supabase_enabled,
@@ -87,7 +88,16 @@ def _memory_dashboard_stats() -> dict:
 def get_dashboard_stats(range_name: str = "week") -> dict:
     if is_supabase_enabled():
         supabase_rows = fetch_supabase_detection_rows()
-        return build_supabase_dashboard_stats(supabase_rows, range_name=range_name)
+        recent_candidates = fetch_supabase_detection_rows(limit=100)
+        recent_supabase_rows = [
+            row for row in recent_candidates
+            if _is_web_detection_row(row)
+        ][:5]
+        return build_supabase_dashboard_stats(
+            supabase_rows,
+            range_name=range_name,
+            recent_rows=recent_supabase_rows,
+        )
     return _memory_dashboard_stats()
 
 

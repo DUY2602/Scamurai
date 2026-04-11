@@ -28,7 +28,13 @@
     "host:cellphones.com.vn": 1,
     "path:cellphones.com.vn|html_content_depth_3_digits_1": 1,
     "host:www.thegioididong.com": 1,
-    "domain:thegioididong.com": 1
+    "domain:thegioididong.com": 1,
+    "host:www.engadget.com": 1,
+    "domain:engadget.com": 1,
+    "path:engadget.com|html_content_depth_3_digits_1": 1,
+    "host:www.messenger.com": 1,
+    "domain:messenger.com": 1,
+    "path:messenger.com|clean_content_depth_3_digits_2": 1
   },
   "threat_observations": {
     "host:ngan-hang-uy-tin.com": 1,

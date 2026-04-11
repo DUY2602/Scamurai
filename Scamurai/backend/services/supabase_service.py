@@ -8,9 +8,11 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
+from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 DEFAULT_DASHBOARD_TREND_ANCHOR = "2026-04-13T00:00:00+00:00"
+DEFAULT_DASHBOARD_TIMEZONE = "Asia/Saigon"
 
 
 def _getenv_first(*names: str) -> str:
@@ -169,7 +171,7 @@ def insert_detection_result(payload: dict) -> bool:
         return False
 
 
-def fetch_detection_rows() -> list[dict]:
+def fetch_detection_rows(limit: int | None = None) -> list[dict]:
     config = _supabase_config()
     if not config:
         logger.warning("Supabase read skipped: missing required env vars.")
@@ -177,7 +179,8 @@ def fetch_detection_rows() -> list[dict]:
 
     rows: list[dict] = []
     offset = 0
-    page_size = max(1, config["page_size"])
+    max_rows = max(1, int(limit)) if limit is not None else None
+    page_size = max(1, min(config["page_size"], max_rows)) if max_rows is not None else max(1, config["page_size"])
     select_fields = ",".join(
         [
             "id",
@@ -187,6 +190,7 @@ def fetch_detection_rows() -> list[dict]:
             "verdict",
             "risk_score",
             "confidence",
+            "session_id",
             "country_name",
             "country_code",
             "city",
@@ -219,6 +223,9 @@ def fetch_detection_rows() -> list[dict]:
                 return rows
 
             rows.extend(batch)
+            if max_rows is not None and len(rows) >= max_rows:
+                rows = rows[:max_rows]
+                break
             if len(batch) < page_size:
                 break
 
@@ -240,6 +247,14 @@ def fetch_detection_rows() -> list[dict]:
         return []
 
     return rows
+
+
+def _is_web_detection_row(row: dict) -> bool:
+    session_id = str(row.get("session_id") or "").strip().lower()
+    if not session_id:
+        return False
+
+    return not session_id.startswith("sess-")
 
 
 def _safe_float(value, default: float = 0.0) -> float:
@@ -282,6 +297,20 @@ def _resolve_trend_anchor_timestamp() -> datetime:
     return _parse_timestamp(configured_value) or datetime(2026, 4, 13, tzinfo=timezone.utc)
 
 
+def _get_dashboard_timezone():
+    timezone_name = os.getenv("DASHBOARD_TIMEZONE", "").strip() or DEFAULT_DASHBOARD_TIMEZONE
+    try:
+        return ZoneInfo(timezone_name)
+    except Exception:
+        return timezone.utc
+
+
+def _to_dashboard_date(timestamp: datetime | None):
+    if timestamp is None:
+        return None
+    return timestamp.astimezone(_get_dashboard_timezone()).date()
+
+
 def _shift_month(date_value, months: int):
     total_months = (date_value.year * 12 + (date_value.month - 1)) + months
     year = total_months // 12
@@ -291,7 +320,7 @@ def _shift_month(date_value, months: int):
 
 
 def _build_trend_dates(anchor_timestamp: datetime, range_name: str) -> list:
-    anchor_date = anchor_timestamp.date()
+    anchor_date = _to_dashboard_date(anchor_timestamp) or anchor_timestamp.date()
     normalized_range = str(range_name or "").lower()
 
     if normalized_range == "month":
@@ -337,7 +366,11 @@ def _build_y_ticks(max_value: int) -> list[int]:
     return ticks
 
 
-def build_dashboard_stats(rows: list[dict], range_name: str = "week") -> dict:
+def build_dashboard_stats(
+    rows: list[dict],
+    range_name: str = "week",
+    recent_rows: list[dict] | None = None,
+) -> dict:
     range_days = _normalize_dashboard_range(range_name)
     summary = {
         "total_scans": 0,
@@ -402,8 +435,9 @@ def build_dashboard_stats(rows: list[dict], range_name: str = "week") -> dict:
             by_type[detection_type][summary_key] += 1
             risk_sums[detection_type] += risk_score
 
-        if created_at and created_at.date() in trend_date_set:
-            day_key = created_at.date().isoformat()
+        trend_day = _to_dashboard_date(created_at)
+        if trend_day and trend_day in trend_date_set:
+            day_key = trend_day.isoformat()
             bucket = trend_buckets.setdefault(
                 day_key,
                 {"day": day_key, "total_scans": 0, "threat_count": 0},
@@ -465,23 +499,24 @@ def build_dashboard_stats(rows: list[dict], range_name: str = "week") -> dict:
                 )
                 bucket["total_scans"] += 1
 
-        if index < 8:
-            recent_detections.append(
-                {
-                    "id": row.get("id"),
-                    "detection_type": row.get("detection_type"),
-                    "source_value": row.get("source_value"),
-                    "status": row.get("status"),
-                    "verdict": row.get("verdict"),
-                    "risk_score": _safe_int(row.get("risk_score"), 0),
-                    "country_name": row.get("country_name"),
-                    "created_at": str(row.get("created_at")),
-                }
-            )
-
     for detection_type, values in by_type.items():
         total = values["total_scans"]
         values["avg_risk_score"] = round(risk_sums[detection_type] / total, 2) if total else 0
+
+    recent_source_rows = recent_rows if recent_rows is not None else sorted_rows[:5]
+    recent_detections = [
+        {
+            "id": row.get("id"),
+            "detection_type": row.get("detection_type"),
+            "source_value": row.get("source_value"),
+            "status": row.get("status"),
+            "verdict": row.get("verdict"),
+            "risk_score": _safe_int(row.get("risk_score"), 0),
+            "country_name": row.get("country_name"),
+            "created_at": str(row.get("created_at")),
+        }
+        for row in recent_source_rows[:5]
+    ]
 
     trend = []
     max_trend_value = 0

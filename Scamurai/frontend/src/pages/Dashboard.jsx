@@ -163,29 +163,75 @@ function buildTrendXAxisTicks(rows) {
     return [];
   }
 
-  const targetTickCount =
-    total > 28 ? 6 : total > 14 ? 7 : total > 8 ? 6 : total;
-  const step = Math.max(1, Math.ceil((total - 1) / Math.max(targetTickCount - 1, 1)));
+  if (total <= 8) {
+    return rows.map((row) => ({
+      key: row.day || "tick",
+      showLabel: true,
+      label: formatTrendAxisLabel(row.day, true),
+      textAnchor: "middle",
+    }));
+  }
+
+  const labeledDates = new Set();
+  const labeledTimes = [];
+  const firstDate = parseDashboardDate(rows[0]?.day);
+  const lastDate = parseDashboardDate(rows[total - 1]?.day);
+  const oneDayMs = 24 * 60 * 60 * 1000;
+
+  if (!Number.isNaN(firstDate.getTime()) && !Number.isNaN(lastDate.getTime())) {
+    const tickStepDays = total > 28 ? 7 : total > 14 ? 4 : 2;
+    const currentTick = new Date(firstDate);
+    while (currentTick <= lastDate) {
+      const tickKey = currentTick.toISOString().slice(0, 10);
+      labeledDates.add(tickKey);
+      labeledTimes.push(currentTick.getTime());
+      currentTick.setDate(currentTick.getDate() + tickStepDays);
+    }
+    while (
+      labeledTimes.length > 1 &&
+      Math.abs(labeledTimes[labeledTimes.length - 1] - lastDate.getTime()) <= 3 * oneDayMs
+    ) {
+      labeledTimes.pop();
+    }
+    labeledDates.clear();
+    labeledTimes.forEach((time) => {
+      labeledDates.add(new Date(time).toISOString().slice(0, 10));
+    });
+    const lastKey = lastDate.toISOString().slice(0, 10);
+    labeledDates.add(lastKey);
+    labeledTimes.push(lastDate.getTime());
+  }
 
   return rows.map((row, index) => {
     const currentDate = parseDashboardDate(row.day);
     const previousDate = index > 0 ? parseDashboardDate(rows[index - 1].day) : null;
     const isBoundary =
       index === 0 ||
-      index === total - 1 ||
-      index % step === 0;
+      index === total - 1;
+    const dayKey = !Number.isNaN(currentDate.getTime())
+      ? currentDate.toISOString().slice(0, 10)
+      : "";
     const crossedMonth =
       previousDate &&
       !Number.isNaN(currentDate.getTime()) &&
       !Number.isNaN(previousDate.getTime()) &&
       currentDate.getMonth() !== previousDate.getMonth();
-    const showLabel = total <= 8 || isBoundary || crossedMonth;
+    const hasNearbyPrimaryTick =
+      !Number.isNaN(currentDate.getTime()) &&
+      labeledTimes.some((time) => Math.abs(time - currentDate.getTime()) <= 2 * oneDayMs);
+    const nearMonthBoundary =
+      crossedMonth &&
+      !labeledDates.has(dayKey) &&
+      !hasNearbyPrimaryTick &&
+      index > 0 &&
+      index < total - 1;
+    const showLabel = isBoundary || labeledDates.has(dayKey) || nearMonthBoundary;
 
     return {
       key: row.day || `tick-${index}`,
       showLabel,
       label: showLabel ? formatTrendAxisLabel(row.day, true) : "",
-      textAnchor: index === 0 ? "start" : index === total - 1 ? "end" : "middle",
+      textAnchor: "middle",
     };
   });
 }
@@ -741,18 +787,24 @@ function TrendChart({ rows, meta }) {
   );
   const chartWidth = width - padding.left - padding.right;
   const chartHeight = height - padding.top - padding.bottom;
-  const stepX = animatedRows.length > 1 ? chartWidth / (animatedRows.length - 1) : 0;
+  const rawStepX = animatedRows.length > 1 ? chartWidth / (animatedRows.length - 1) : 0;
   const barWidth =
     animatedRows.length > 14
-      ? Math.max(10, stepX * 0.54)
-      : Math.min(44, Math.max(stepX * 0.56, 18));
+      ? Math.max(10, rawStepX * 0.54)
+      : Math.min(44, Math.max(rawStepX * 0.56, 18));
+  const plotStartX = padding.left + barWidth / 2 + 8;
+  const plotEndX = width - padding.right - barWidth / 2 - 8;
+  const stepX =
+    animatedRows.length > 1
+      ? (plotEndX - plotStartX) / (animatedRows.length - 1)
+      : 0;
 
   const points = animatedRows.map((row, index) => {
     const totalScans = Number(row.total_scans || 0);
     const threatCount = Number(row.threat_count || 0);
     const x =
       animatedRows.length > 1
-        ? padding.left + index * stepX
+        ? plotStartX + index * stepX
         : padding.left + chartWidth / 2;
     const barHeight = (totalScans / maxValue) * chartHeight;
     const lineY = padding.top + chartHeight - (threatCount / maxValue) * chartHeight;
