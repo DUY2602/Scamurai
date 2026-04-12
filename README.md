@@ -133,7 +133,7 @@ SUPABASE_TABLE=detection_results
 | Method | Path | Description |
 |--------|------|-------------|
 | POST | `/url` | Scan URL for phishing/malware |
-| POST | `/url/feedback` | Submit feedback to improve model |
+
 
 ### File Detection
 

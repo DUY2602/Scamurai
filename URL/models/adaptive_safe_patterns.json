@@ -33,13 +33,13 @@
   ],
   "threat_hostnames": [
     "45.67.89.120",
-    "bangiaygiare.com",
+    "cheap-cracked-software.org",
     "paypal-secure-login.example.xyz"
   ],
-  "threat_registered_domains": [
-    "bangiaygiare.com"
+  "threat_registered_domains": ["cheap-cracked-software.org"],
+  "threat_path_signatures": [
+    "cheap-cracked-software.org|clean_content_depth_2_digits_0"
   ],
-  "threat_path_signatures": [],
   "safe_observations": {
     "host:cellphones.com.vn": 1,
     "path:cellphones.com.vn|html_content_depth_3_digits_1": 1,
@@ -77,6 +77,11 @@
     "host:45.67.89.120": 2,
     "host:8.8.8.8": 1,
     "host:paypal-secure-login.example.xyz": 2,
-    "host:micros0ft-office365.login-portal.net": 1
+    "host:micros0ft-office365.login-portal.net": 1,
+    "host:account-verify-paypal.net": 1,
+    "domain:account-verify-paypal.net": 1,
+    "host:cheap-cracked-software.org": 2,
+    "domain:cheap-cracked-software.org": 2,
+    "path:cheap-cracked-software.org|clean_content_depth_2_digits_0": 2
   }
 }

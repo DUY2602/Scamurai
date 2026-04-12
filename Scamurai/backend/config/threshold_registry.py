@@ -67,7 +67,7 @@ class ThresholdRegistry:
     # Default fallback thresholds if training reports unavailable
     DEFAULTS = {
         "file": ThresholdConfig("file", threat_threshold=70.0, suspicious_threshold=40.0),
-        "email": ThresholdConfig("email", threat_threshold=60.0, suspicious_threshold=45.0),
+        "email": ThresholdConfig("email", threat_threshold=70.0, suspicious_threshold=45.0),
         "url": ThresholdConfig("url", threat_threshold=70.0, suspicious_threshold=40.0),
     }
 
