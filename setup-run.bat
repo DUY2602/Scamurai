@@ -57,6 +57,9 @@ if not exist "%VENV_DIR%" (
 
 set "PYTHON_EXE=%VENV_DIR%\Scripts\python.exe"
 set "PIP_EXE=%VENV_DIR%\Scripts\pip.exe"
+set "POWERSHELL_PYTHON_EXE=%PYTHON_EXE:\=\\%"
+set "POWERSHELL_BACKEND_DIR=%BACKEND_DIR:\=\\%"
+set "POWERSHELL_FRONTEND_DIR=%FRONTEND_DIR:\=\\%"
 
 echo Installing Python dependencies...
 "%PIP_EXE%" install -r "%SCAMURAI_DIR%\requirements.txt" --quiet
@@ -78,9 +81,9 @@ echo Frontend: http://127.0.0.1:5173
 echo ========================================
 echo.
 
-start "Scamurai Backend" powershell -NoExit -ExecutionPolicy Bypass -Command "Set-Location '%BACKEND_DIR%'; %PYTHON_EXE% -m uvicorn backend.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8000"
+start "Scamurai Backend" powershell -NoExit -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%POWERSHELL_BACKEND_DIR%'; & '%POWERSHELL_PYTHON_EXE%' -m uvicorn backend.main:app --reload --reload-dir backend --host 127.0.0.1 --port 8000"
 
-start "Scamurai Frontend" powershell -NoExit -ExecutionPolicy Bypass -Command "Set-Location '%FRONTEND_DIR%'; npm.cmd run dev -- --host 127.0.0.1 --port 5173 --force"
+start "Scamurai Frontend" powershell -NoExit -ExecutionPolicy Bypass -Command "Set-Location -LiteralPath '%POWERSHELL_FRONTEND_DIR%'; & npm.cmd run dev -- --host 127.0.0.1 --port 5173 --force"
 
 echo Started! Access the web at http://127.0.0.1:5173
 pause
