@@ -3,6 +3,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load .env.local if exists
+env_path = Path(__file__).parent.parent.parent / ".env.local"
+if env_path.exists():
+    load_dotenv(env_path)
+
 from backend.router import dashboard, email, url, file
 
 app = FastAPI(title="SCAMURAI API", version="3.0")

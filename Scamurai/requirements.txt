@@ -8,3 +8,4 @@ pefile
 python-multipart
 pandas
 numpy
+python-dotenv

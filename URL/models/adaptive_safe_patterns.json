@@ -4,6 +4,7 @@
     "app.shopee.vn",
     "cellphones.com.vn",
     "coursera.org",
+    "eventing.coursera.org",
     "github.com",
     "ngoisao.vnexpress.net",
     "sheerid.com)",
@@ -63,7 +64,8 @@
     "domain:freecodecamp.org": 7,
     "path:freecodecamp.org|clean_content_depth_2_digits_0": 3,
     "path:freecodecamp.org|clean_content_depth_2_digits_1": 2,
-    "path:freecodecamp.org|clean_content_depth_1_digits_0": 1
+    "path:freecodecamp.org|clean_content_depth_1_digits_0": 1,
+    "host:eventing.coursera.org": 29
   },
   "threat_observations": {
     "host:ngan-hang-uy-tin.com": 1,
@@ -74,6 +76,7 @@
     "domain:bangiaygiare.com": 2,
     "host:45.67.89.120": 2,
     "host:8.8.8.8": 1,
-    "host:paypal-secure-login.example.xyz": 2
+    "host:paypal-secure-login.example.xyz": 2,
+    "host:micros0ft-office365.login-portal.net": 1
   }
 }
