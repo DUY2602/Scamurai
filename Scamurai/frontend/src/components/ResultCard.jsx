@@ -227,8 +227,6 @@ function getGaugeMeta(tone) {
 const PRIORITY_SCALAR_KEYS = [
   "confidence",
   "predicted_class",
-  "model_agreement",
-  "signal_strength",
 ];
 
 function getToneMeta(tone) {
@@ -410,26 +408,23 @@ export default function ResultCard({ title, status, score, data }) {
     duplicateKeys.add("score");
   }
 
-  const scalarEntries = [];
-  const nestedEntries = [];
-
-  Object.entries(data).forEach(([key, value]) => {
-    if (duplicateKeys.has(key) || hiddenKeys.has(key) || shouldHideEntry(key, value)) {
-      return;
-    }
-
-    if (Array.isArray(value) || isPlainObject(value)) {
-      nestedEntries.push([key, value]);
-      return;
-    }
-
-    scalarEntries.push([key, value]);
-  });
-
   const priorityEntries = PRIORITY_SCALAR_KEYS.flatMap((key) => {
-    const matchedEntry = scalarEntries.find(([entryKey]) => entryKey === key);
+    const matchedEntry = Object.entries(data).find(
+      ([entryKey, entryValue]) =>
+        entryKey === key &&
+        !duplicateKeys.has(entryKey) &&
+        !hiddenKeys.has(entryKey) &&
+        !shouldHideEntry(entryKey, entryValue)
+    );
     return matchedEntry ? [matchedEntry] : [];
   });
+
+  const nestedEntries = Object.entries(data).filter(
+    ([key, value]) =>
+      key === "key_features" &&
+      !hiddenKeys.has(key) &&
+      !shouldHideEntry(key, value)
+  );
 
   return (
     <section className={`result-card result-card--${tone}`}>

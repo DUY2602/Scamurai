@@ -1267,8 +1267,6 @@ def predict_url(url: str) -> dict:
     verdict = "MALICIOUS" if status == "threat" else ("SUSPICIOUS" if status == "suspicious" else "BENIGN")
     predicted_class = "malicious" if adjusted_prob >= 0.5 else "benign"
     decision_threshold = round(THREAT_THRESHOLD, 2)
-    model_agreement = "high" if abs(lgbm_prob - xgb_prob) <= 0.15 else "mixed"
-    
     key_features = {
         "keyword_count": features["keyword_count"],
         "entropy": features["entropy"],
@@ -1320,7 +1318,6 @@ def predict_url(url: str) -> dict:
         "verdict": verdict,
         "predicted_class": predicted_class,
         "decision_threshold": decision_threshold,
-        "model_agreement": model_agreement,
         "risk_score": risk_score,
         "confidence": confidence,
         "is_malicious": status == "threat",

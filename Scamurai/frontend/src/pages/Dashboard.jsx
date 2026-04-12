@@ -1334,9 +1334,9 @@ export default function Dashboard() {
           <article className="panel">
             <div className="page-header">
               <div className="page-header__content">
-                <h2 className="panel__title">Detection mix</h2>
+                <h2 className="panel__title">Training data</h2>
                 <p className="panel__description">
-                  Switch model topics and inspect how the training split changes.
+                  Switch model topics and inspect how the training data distribution changes.
                 </p>
               </div>
 

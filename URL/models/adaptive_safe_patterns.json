@@ -3,23 +3,37 @@
     "app.ganttpro.com",
     "app.shopee.vn",
     "cellphones.com.vn",
+    "coursera.org",
+    "github.com",
     "ngoisao.vnexpress.net",
+    "sheerid.com)",
     "shopee.vn",
     "www.booking.com",
+    "www.freecodecamp.org",
     "www.thegioididong.com"
   ],
   "safe_registered_domains": [
     "booking.com",
+    "coursera.org",
+    "freecodecamp.org",
+    "github.com",
+    "sheerid.com)",
     "shopee.vn",
     "thegioididong.com"
   ],
   "safe_path_signatures": [
     "cellphones.com.vn|html_content_depth_3_digits_1",
+    "coursera.org|clean_content_depth_1_digits_0",
+    "freecodecamp.org|clean_content_depth_2_digits_0",
+    "freecodecamp.org|clean_content_depth_2_digits_1",
+    "github.com|clean_content_depth_1_digits_0",
+    "github.com|clean_content_depth_2_digits_0",
     "vnexpress.net|html_content_depth_1_digits_1"
   ],
   "threat_hostnames": [
     "45.67.89.120",
-    "bangiaygiare.com"
+    "bangiaygiare.com",
+    "paypal-secure-login.example.xyz"
   ],
   "threat_registered_domains": [
     "bangiaygiare.com"
@@ -35,7 +49,21 @@
     "path:engadget.com|html_content_depth_3_digits_1": 1,
     "host:www.messenger.com": 1,
     "domain:messenger.com": 1,
-    "path:messenger.com|clean_content_depth_3_digits_2": 1
+    "path:messenger.com|clean_content_depth_3_digits_2": 1,
+    "host:github.com": 8,
+    "domain:github.com": 8,
+    "path:github.com|clean_content_depth_2_digits_0": 6,
+    "host:coursera.org": 2,
+    "domain:coursera.org": 2,
+    "path:coursera.org|clean_content_depth_1_digits_0": 2,
+    "path:github.com|clean_content_depth_1_digits_0": 2,
+    "host:sheerid.com)": 4,
+    "domain:sheerid.com)": 4,
+    "host:www.freecodecamp.org": 7,
+    "domain:freecodecamp.org": 7,
+    "path:freecodecamp.org|clean_content_depth_2_digits_0": 3,
+    "path:freecodecamp.org|clean_content_depth_2_digits_1": 2,
+    "path:freecodecamp.org|clean_content_depth_1_digits_0": 1
   },
   "threat_observations": {
     "host:ngan-hang-uy-tin.com": 1,
@@ -45,6 +73,7 @@
     "host:bangiaygiare.com": 2,
     "domain:bangiaygiare.com": 2,
     "host:45.67.89.120": 2,
-    "host:8.8.8.8": 1
+    "host:8.8.8.8": 1,
+    "host:paypal-secure-login.example.xyz": 2
   }
 }

@@ -335,7 +335,7 @@ img {
 }
 
 .hero-story__title {
-  max-width: 12ch;
+  max-width: 20ch;
 }
 
 .hero-story__description {
@@ -347,11 +347,11 @@ img {
 }
 
 .hero-story__title--wide {
-  max-width: 15ch;
+  max-width: 36ch;
 }
 
 .hero-story__description--wide {
-  max-width: 64rem;
+  max-width: 46rem;
 }
 
 .status-pill {
@@ -606,6 +606,27 @@ img {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.9rem;
+}
+
+.home-ml-band {
+  margin-top: 0.5rem;
+}
+
+.home-ml-band__header {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.home-ml-band__lead {
+  margin: 0;
+  max-width: 54rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.home-ml-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(247, 250, 255, 0.92) 100%);
 }
 
 .timeline-card {
@@ -2393,6 +2414,7 @@ img {
   .kv-grid,
   .metrics-grid,
   .hero-signal-grid,
+  .home-ml-band__header,
   .landing-band__grid,
   .home-actions__grid,
   .home-summary-strip,
@@ -2460,7 +2482,8 @@ img {
   .hero-story__topline,
   .hero-cta-row,
   .hero-map-card__meta,
-  .home-actions__header {
+  .home-actions__header,
+  .home-ml-band__header {
     width: 100%;
   }
 

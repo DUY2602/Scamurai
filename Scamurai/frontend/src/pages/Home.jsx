@@ -39,6 +39,21 @@ const compactSignals = [
   },
 ];
 
+const mlHighlights = [
+  {
+    title: "Pattern learning",
+    text: "ML helps Scamurai learn suspicious behavior from email text, URL structure, and executable features instead of relying only on fixed rules.",
+  },
+  {
+    title: "Modern cyber fit",
+    text: "Modern attacks change quickly, so ML is useful for spotting hidden signals, mixed indicators, and suspicious combinations that static logic may miss.",
+  },
+  {
+    title: "Practical output",
+    text: "The models are connected to clear verdicts, risk scoring, and readable key features so the system stays usable for demos and real scanning flows.",
+  },
+];
+
 export default function Home() {
   return (
     <div className="page-shell page">
@@ -71,6 +86,27 @@ export default function Home() {
             <span className="chip chip--warning">Dashboard insights</span>
             <span className="chip chip--safe">Readable output</span>
           </div>
+        </div>
+      </section>
+
+      <section className="home-ml-band landing-band">
+        <div className="home-ml-band__header">
+          <p className="eyebrow">Machine Learning</p>
+          <h2 className="landing-band__title">Why ML matters for modern cyber detection</h2>
+          <p className="home-ml-band__lead">
+            Scamurai uses machine learning to detect patterns that are harder to capture with
+            static rules alone, especially across evolving phishing, malicious links, and malware.
+          </p>
+        </div>
+
+        <div className="landing-band__grid">
+          {mlHighlights.map((item) => (
+            <article className="timeline-card home-ml-card" key={item.title}>
+              <span className="timeline-card__step">ML Signal</span>
+              <h3 className="timeline-card__title">{item.title}</h3>
+              <p className="timeline-card__text">{item.text}</p>
+            </article>
+          ))}
         </div>
       </section>
 
