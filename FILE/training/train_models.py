@@ -5,9 +5,14 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 import joblib
 import numpy as np
@@ -21,7 +26,7 @@ from xgboost import XGBClassifier
 
 # Try to import v2 feature extractors
 try:
-    from feature_engineering_v2 import (
+    from FILE.training.feature_engineering_v2 import (
         is_packed,
         import_category_score,
         has_tls,
